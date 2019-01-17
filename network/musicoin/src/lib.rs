@@ -35,28 +35,28 @@ pub type MainnetFrontierPatch = FrontierPatch<MainnetAccountPatch>;
 impl<A: AccountPatch> Patch for FrontierPatch<A> {
     type Account = A;
 
-    fn code_deposit_limit() -> Option<usize> { None }
-    fn callstack_limit() -> usize { 1024 }
-    fn gas_extcode() -> Gas { Gas::from(20usize) }
-    fn gas_balance() -> Gas { Gas::from(20usize) }
-    fn gas_sload() -> Gas { Gas::from(50usize) }
-    fn gas_suicide() -> Gas { Gas::from(0usize) }
-    fn gas_suicide_new_account() -> Gas { Gas::from(0usize) }
-    fn gas_call() -> Gas { Gas::from(40usize) }
-    fn gas_expbyte() -> Gas { Gas::from(10usize) }
-    fn gas_transaction_create() -> Gas { Gas::from(0usize) }
-    fn force_code_deposit() -> bool { true }
-    fn has_delegate_call() -> bool { false }
-    fn has_static_call() -> bool { false }
-    fn has_revert() -> bool { false }
-    fn has_return_data() -> bool { false }
-    fn has_bitwise_shift() -> bool { false }
-    fn has_extcodehash() -> bool { false }
-    fn has_reduced_sstore_gas_metering() -> bool { false }
-    fn err_on_call_with_more_gas() -> bool { true }
-    fn call_create_l64_after_gas() -> bool { false }
-    fn memory_limit() -> usize { usize::max_value() }
-    fn precompileds() -> &'static [(Address, Option<&'static [u8]>, &'static Precompiled)] {
+    fn code_deposit_limit(&self) -> Option<usize> { None }
+    fn callstack_limit(&self) -> usize { 1024 }
+    fn gas_extcode(&self) -> Gas { Gas::from(20usize) }
+    fn gas_balance(&self) -> Gas { Gas::from(20usize) }
+    fn gas_sload(&self) -> Gas { Gas::from(50usize) }
+    fn gas_suicide(&self) -> Gas { Gas::from(0usize) }
+    fn gas_suicide_new_account(&self) -> Gas { Gas::from(0usize) }
+    fn gas_call(&self) -> Gas { Gas::from(40usize) }
+    fn gas_expbyte(&self) -> Gas { Gas::from(10usize) }
+    fn gas_transaction_create(&self) -> Gas { Gas::from(0usize) }
+    fn force_code_deposit(&self) -> bool { true }
+    fn has_delegate_call(&self) -> bool { false }
+    fn has_static_call(&self) -> bool { false }
+    fn has_revert(&self) -> bool { false }
+    fn has_return_data(&self) -> bool { false }
+    fn has_bitwise_shift(&self) -> bool { false }
+    fn has_extcodehash(&self) -> bool { false }
+    fn has_reduced_sstore_gas_metering(&self) -> bool { false }
+    fn err_on_call_with_more_gas(&self) -> bool { true }
+    fn call_create_l64_after_gas(&self) -> bool { false }
+    fn memory_limit(&self) -> usize { usize::max_value() }
+    fn precompileds(&self) -> &'static [(Address, Option<&'static [u8]>, &'static Precompiled)] {
         &MUSIC_PRECOMPILEDS }
 }
 
@@ -66,27 +66,27 @@ pub type MainnetHomesteadPatch = HomesteadPatch<MainnetAccountPatch>;
 impl<A: AccountPatch> Patch for HomesteadPatch<A> {
     type Account = A;
 
-    fn code_deposit_limit() -> Option<usize> { None }
-    fn callstack_limit() -> usize { 1024 }
-    fn gas_extcode() -> Gas { Gas::from(20usize) }
-    fn gas_balance() -> Gas { Gas::from(20usize) }
-    fn gas_sload() -> Gas { Gas::from(50usize) }
-    fn gas_suicide() -> Gas { Gas::from(0usize) }
-    fn gas_suicide_new_account() -> Gas { Gas::from(0usize) }
-    fn gas_call() -> Gas { Gas::from(40usize) }
-    fn gas_expbyte() -> Gas { Gas::from(10usize) }
-    fn gas_transaction_create() -> Gas { Gas::from(32000usize) }
-    fn force_code_deposit() -> bool { false }
-    fn has_delegate_call() -> bool { true }
-    fn has_static_call() -> bool { false }
-    fn has_revert() -> bool { false }
-    fn has_return_data() -> bool { false }
-    fn has_bitwise_shift() -> bool { false }
-    fn has_extcodehash() -> bool { false }
-    fn has_reduced_sstore_gas_metering() -> bool { false }
-    fn err_on_call_with_more_gas() -> bool { true }
-    fn call_create_l64_after_gas() -> bool { false }
-    fn memory_limit() -> usize { usize::max_value() }
-    fn precompileds() -> &'static [(Address, Option<&'static [u8]>, &'static Precompiled)] {
+    fn code_deposit_limit(&self) -> Option<usize> { None }
+    fn callstack_limit(&self) -> usize { 1024 }
+    fn gas_extcode(&self) -> Gas { Gas::from(20usize) }
+    fn gas_balance(&self) -> Gas { Gas::from(20usize) }
+    fn gas_sload(&self) -> Gas { Gas::from(50usize) }
+    fn gas_suicide(&self) -> Gas { Gas::from(0usize) }
+    fn gas_suicide_new_account(&self) -> Gas { Gas::from(0usize) }
+    fn gas_call(&self) -> Gas { Gas::from(40usize) }
+    fn gas_expbyte(&self) -> Gas { Gas::from(10usize) }
+    fn gas_transaction_create(&self) -> Gas { Gas::from(32000usize) }
+    fn force_code_deposit(&self) -> bool { false }
+    fn has_delegate_call(&self) -> bool { true }
+    fn has_static_call(&self) -> bool { false }
+    fn has_revert(&self) -> bool { false }
+    fn has_return_data(&self) -> bool { false }
+    fn has_bitwise_shift(&self) -> bool { false }
+    fn has_extcodehash(&self) -> bool { false }
+    fn has_reduced_sstore_gas_metering(&self) -> bool { false }
+    fn err_on_call_with_more_gas(&self) -> bool { true }
+    fn call_create_l64_after_gas(&self) -> bool { false }
+    fn memory_limit(&self) -> usize { usize::max_value() }
+    fn precompileds(&self) -> &'static [(Address, Option<&'static [u8]>, &'static Precompiled)] {
         &MUSIC_PRECOMPILEDS }
 }

@@ -2,12 +2,14 @@
 //! block range.
 
 mod precompiled;
+mod dynamic;
 
 pub use self::precompiled::*;
 
 use bigint::{Address, Gas, U256, H160};
 
 /// Account patch for account related variables.
+/// Account patch is always static, as it's usually stays constant for any given network.
 pub trait AccountPatch {
     /// Initial nonce for accounts.
     fn initial_nonce() -> U256;
@@ -22,6 +24,7 @@ pub trait AccountPatch {
 }
 
 /// Mainnet account patch
+#[derive(Default, Copy, Clone)]
 pub struct EmbeddedAccountPatch;
 impl AccountPatch for EmbeddedAccountPatch {
     fn initial_nonce() -> U256 { U256::zero() }
@@ -30,6 +33,7 @@ impl AccountPatch for EmbeddedAccountPatch {
 }
 
 /// Mainnet account patch
+#[derive(Default, Copy, Clone)]
 pub struct EmbeddedByzantiumAccountPatch;
 impl AccountPatch for EmbeddedByzantiumAccountPatch {
     fn initial_nonce() -> U256 { U256::zero() }
@@ -42,59 +46,62 @@ pub trait Patch {
     /// Account patch
     type Account: AccountPatch;
 
+    /// Unimplemented by default for backward-compatibility with static patches
+    fn set_block_number(&self, _block_number: U256) {}
     /// Maximum contract size.
-    fn code_deposit_limit() -> Option<usize>;
+    fn code_deposit_limit(&self) -> Option<usize>;
     /// Limit of the call stack.
-    fn callstack_limit() -> usize;
+    fn callstack_limit(&self) -> usize;
     /// Gas paid for extcode.
-    fn gas_extcode() -> Gas;
+    fn gas_extcode(&self) -> Gas;
     /// Gas paid for BALANCE opcode.
-    fn gas_balance() -> Gas;
+    fn gas_balance(&self) -> Gas;
     /// Gas paid for SLOAD opcode.
-    fn gas_sload() -> Gas;
+    fn gas_sload(&self) -> Gas;
     /// Gas paid for SUICIDE opcode.
-    fn gas_suicide() -> Gas;
+    fn gas_suicide(&self) -> Gas;
     /// Gas paid for SUICIDE opcode when it hits a new account.
-    fn gas_suicide_new_account() -> Gas;
+    fn gas_suicide_new_account(&self) -> Gas;
     /// Gas paid for CALL opcode.
-    fn gas_call() -> Gas;
+    fn gas_call(&self) -> Gas;
     /// Gas paid for EXP opcode for every byte.
-    fn gas_expbyte() -> Gas;
+    fn gas_expbyte(&self) -> Gas;
     /// Gas paid for a contract creation transaction.
-    fn gas_transaction_create() -> Gas;
+    fn gas_transaction_create(&self) -> Gas;
     /// Whether to force code deposit even if it does not have enough
     /// gas.
-    fn force_code_deposit() -> bool;
+    fn force_code_deposit(&self) -> bool;
     /// Whether the EVM has DELEGATECALL opcode.
-    fn has_delegate_call() -> bool;
+    fn has_delegate_call(&self) -> bool;
     /// Whether the EVM has STATICCALL opcode.
-    fn has_static_call() -> bool;
+    fn has_static_call(&self) -> bool;
     /// Whether the EVM has REVERT opcode.
-    fn has_revert() -> bool;
+    fn has_revert(&self) -> bool;
     /// Whether the EVM has RETURNDATASIZE and RETURNDATACOPY opcode.
-    fn has_return_data() -> bool;
+    fn has_return_data(&self) -> bool;
     /// Whether the EVM has SHL, SHR and SAR
-    fn has_bitwise_shift() -> bool;
+    fn has_bitwise_shift(&self) -> bool;
     /// Whether the EVM has EXTCODEHASH
-    fn has_extcodehash() -> bool;
+    fn has_extcodehash(&self) -> bool;
     /// Whether EVM should implement the EIP1283 gas metering scheme for SSTORE opcode
-    fn has_reduced_sstore_gas_metering() -> bool;
+    fn has_reduced_sstore_gas_metering(&self) -> bool;
     /// Whether to throw out of gas error when
     /// CALL/CALLCODE/DELEGATECALL requires more than maximum amount
     /// of gas.
-    fn err_on_call_with_more_gas() -> bool;
+    fn err_on_call_with_more_gas(&self) -> bool;
     /// If true, only consume at maximum l64(after_gas) when
     /// CALL/CALLCODE/DELEGATECALL.
-    fn call_create_l64_after_gas() -> bool;
+    fn call_create_l64_after_gas(&self) -> bool;
     /// Maximum size of the memory, in bytes.
-    fn memory_limit() -> usize;
+    /// NOTE: **NOT** runtime-configurable by block number
+    fn memory_limit(&self) -> usize;
     /// Precompiled contracts at given address, with required code,
     /// and its definition.
-    fn precompileds() -> &'static [(Address, Option<&'static [u8]>, &'static Precompiled)];
+    fn precompileds(&self) -> &[(Address, Option<&[u8]>, &dyn Precompiled)];
 }
 
 /// Default precompiled collections.
-pub static EMBEDDED_PRECOMPILEDS: [(Address, Option<&'static [u8]>, &'static Precompiled); 4] = [
+pub static EMBEDDED_PRECOMPILEDS: [(Address, Option<&'static [u8]>, &'static dyn Precompiled); 4] = [
     (H160([0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0x01]),
      None,
      &ECREC_PRECOMPILED),
@@ -110,62 +117,67 @@ pub static EMBEDDED_PRECOMPILEDS: [(Address, Option<&'static [u8]>, &'static Pre
 ];
 
 /// Patch sepcific for the `jsontests` crate.
-pub struct VMTestPatch;
+#[derive(Default, Copy, Clone)]
+pub struct VMTestPatch(EmbeddedAccountPatch);
+
 impl Patch for VMTestPatch {
     type Account = EmbeddedAccountPatch;
 
-    fn code_deposit_limit() -> Option<usize> { None }
-    fn callstack_limit() -> usize { 2 }
-    fn gas_extcode() -> Gas { Gas::from(20usize) }
-    fn gas_balance() -> Gas { Gas::from(20usize) }
-    fn gas_sload() -> Gas { Gas::from(50usize) }
-    fn gas_suicide() -> Gas { Gas::from(0usize) }
-    fn gas_suicide_new_account() -> Gas { Gas::from(0usize) }
-    fn gas_call() -> Gas { Gas::from(40usize) }
-    fn gas_expbyte() -> Gas { Gas::from(10usize) }
-    fn gas_transaction_create() -> Gas { Gas::from(0usize) }
-    fn force_code_deposit() -> bool { true }
-    fn has_delegate_call() -> bool { true }
-    fn has_static_call() -> bool { true }
-    fn has_revert() -> bool { true }
-    fn has_return_data() -> bool { true }
-    fn has_bitwise_shift() -> bool { true }
-    fn has_extcodehash() -> bool { true }
-    fn has_reduced_sstore_gas_metering() -> bool { false }
-    fn err_on_call_with_more_gas() -> bool { true }
-    fn call_create_l64_after_gas() -> bool { false }
-    fn memory_limit() -> usize { usize::max_value() }
-    fn precompileds() -> &'static [(Address, Option<&'static [u8]>, &'static Precompiled)] {
-        &EMBEDDED_PRECOMPILEDS }
+    fn code_deposit_limit(&self) -> Option<usize> { None }
+    fn callstack_limit(&self) -> usize { 2 }
+    fn gas_extcode(&self) -> Gas { Gas::from(20usize) }
+    fn gas_balance(&self) -> Gas { Gas::from(20usize) }
+    fn gas_sload(&self) -> Gas { Gas::from(50usize) }
+    fn gas_suicide(&self) -> Gas { Gas::from(0usize) }
+    fn gas_suicide_new_account(&self) -> Gas { Gas::from(0usize) }
+    fn gas_call(&self) -> Gas { Gas::from(40usize) }
+    fn gas_expbyte(&self) -> Gas { Gas::from(10usize) }
+    fn gas_transaction_create(&self) -> Gas { Gas::from(0usize) }
+    fn force_code_deposit(&self) -> bool { true }
+    fn has_delegate_call(&self) -> bool { true }
+    fn has_static_call(&self) -> bool { true }
+    fn has_revert(&self) -> bool { true }
+    fn has_return_data(&self) -> bool { true }
+    fn has_bitwise_shift(&self) -> bool { true }
+    fn has_extcodehash(&self) -> bool { true }
+    fn has_reduced_sstore_gas_metering(&self) -> bool { false }
+    fn err_on_call_with_more_gas(&self) -> bool { true }
+    fn call_create_l64_after_gas(&self) -> bool { false }
+    fn memory_limit(&self) -> usize { usize::max_value() }
+    fn precompileds(&self) -> &'static [(Address, Option<&'static [u8]>, &'static dyn Precompiled)] {
+        &EMBEDDED_PRECOMPILEDS
+    }
 }
 
 /// Embedded patch.
-pub struct EmbeddedPatch;
+#[derive(Default, Copy, Clone)]
+pub struct EmbeddedPatch(EmbeddedAccountPatch);
+
 impl Patch for EmbeddedPatch {
     type Account = EmbeddedAccountPatch;
 
-    fn code_deposit_limit() -> Option<usize> { None }
-    fn callstack_limit() -> usize { 1024 }
-    fn gas_extcode() -> Gas { Gas::from(700usize) }
-    fn gas_balance() -> Gas { Gas::from(400usize) }
-    fn gas_sload() -> Gas { Gas::from(200usize) }
-    fn gas_suicide() -> Gas { Gas::from(5000usize) }
-    fn gas_suicide_new_account() -> Gas { Gas::from(25000usize) }
-    fn gas_call() -> Gas { Gas::from(700usize) }
-    fn gas_expbyte() -> Gas { Gas::from(50usize) }
-    fn gas_transaction_create() -> Gas { Gas::from(32000usize) }
-    fn force_code_deposit() -> bool { false }
-    fn has_delegate_call() -> bool { true }
-    fn has_static_call() -> bool { false }
-    fn has_revert() -> bool { false }
-    fn has_return_data() -> bool { false }
-    fn has_bitwise_shift() -> bool { false }
-    fn has_extcodehash() -> bool { false }
-    fn has_reduced_sstore_gas_metering() -> bool { false }
-    fn err_on_call_with_more_gas() -> bool { false }
-    fn call_create_l64_after_gas() -> bool { true }
-    fn memory_limit() -> usize { usize::max_value() }
-    fn precompileds() -> &'static [(Address, Option<&'static [u8]>, &'static Precompiled)] {
+    fn code_deposit_limit(&self) -> Option<usize> { None }
+    fn callstack_limit(&self) -> usize { 1024 }
+    fn gas_extcode(&self) -> Gas { Gas::from(700usize) }
+    fn gas_balance(&self) -> Gas { Gas::from(400usize) }
+    fn gas_sload(&self) -> Gas { Gas::from(200usize) }
+    fn gas_suicide(&self) -> Gas { Gas::from(5000usize) }
+    fn gas_suicide_new_account(&self) -> Gas { Gas::from(25000usize) }
+    fn gas_call(&self) -> Gas { Gas::from(700usize) }
+    fn gas_expbyte(&self) -> Gas { Gas::from(50usize) }
+    fn gas_transaction_create(&self) -> Gas { Gas::from(32000usize) }
+    fn force_code_deposit(&self) -> bool { false }
+    fn has_delegate_call(&self) -> bool { true }
+    fn has_static_call(&self) -> bool { false }
+    fn has_revert(&self) -> bool { false }
+    fn has_return_data(&self) -> bool { false }
+    fn has_bitwise_shift(&self) -> bool { false }
+    fn has_extcodehash(&self) -> bool { false }
+    fn has_reduced_sstore_gas_metering(&self) -> bool { false }
+    fn err_on_call_with_more_gas(&self) -> bool { false }
+    fn call_create_l64_after_gas(&self) -> bool { true }
+    fn memory_limit(&self) -> usize { usize::max_value() }
+    fn precompileds(&self) -> &'static [(Address, Option<&'static [u8]>, &'static dyn Precompiled)] {
         &EMBEDDED_PRECOMPILEDS
     }
 }

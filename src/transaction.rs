@@ -70,7 +70,7 @@ pub struct UntrustedTransaction {
 
 impl UntrustedTransaction {
     /// Convert to a valid transaction.
-    pub fn to_valid<P: Patch>(&self) -> Result<ValidTransaction, PreExecutionError> {
+    pub fn to_valid<P: Patch>(&self, patch: &P) -> Result<ValidTransaction, PreExecutionError> {
         let valid = {
             let (nonce, balance, address) = match self.caller.clone() {
                 AccountCommitment::Full { nonce, balance, address, .. } => {
@@ -104,7 +104,7 @@ impl UntrustedTransaction {
             }
         };
 
-        if valid.gas_limit < valid.intrinsic_gas::<P>() {
+        if valid.gas_limit < valid.intrinsic_gas(patch.gas_transaction_create()) {
             Err(PreExecutionError::InsufficientGasLimit)
         } else {
             Ok(valid)
@@ -150,7 +150,7 @@ impl ValidTransaction {
     /// Create a valid transaction from a block transaction. Caller is
     /// always Some.
     pub fn from_transaction<P: Patch>(
-        transaction: &Transaction, account_state: &AccountState<P::Account>
+        patch: &P, transaction: &Transaction, account_state: &AccountState<P::Account>
     ) -> Result<Result<ValidTransaction, PreExecutionError>, RequireError> {
         let caller = match transaction.caller() {
             Ok(val) => val,
@@ -172,7 +172,7 @@ impl ValidTransaction {
             nonce,
         };
 
-        if valid.gas_limit < valid.intrinsic_gas::<P>() {
+        if valid.gas_limit < valid.intrinsic_gas(patch.gas_transaction_create()) {
             return Ok(Err(PreExecutionError::InsufficientGasLimit));
         }
 
@@ -203,11 +203,11 @@ impl ValidTransaction {
 
     /// Intrinsic gas to be paid in prior to this transaction
     /// execution.
-    pub fn intrinsic_gas<P: Patch>(&self) -> Gas {
+    pub fn intrinsic_gas(&self, gas_transaction_create: Gas) -> Gas {
         let mut gas = Gas::from(G_TRANSACTION);
 
         if self.action == TransactionAction::Create {
-            gas = gas + P::gas_transaction_create();
+            gas = gas + gas_transaction_create;
         }
 
         for d in self.input.deref() {
@@ -296,6 +296,7 @@ enum TransactionVMState<M, P: Patch> {
         fresh_account_state: AccountState<P::Account>,
     },
     Constructing {
+        patch: P,
         transaction: ValidTransaction,
         block: HeaderParams,
 
@@ -307,12 +308,14 @@ enum TransactionVMState<M, P: Patch> {
 /// A VM that executes using a transaction and block information.
 pub struct TransactionVM<M, P: Patch>(TransactionVMState<M, P>);
 
-impl<M: Memory + Default, P: Patch> TransactionVM<M, P> {
+impl<M: Memory, P: Patch + Clone> TransactionVM<M, P> {
     /// Create a VM from an untrusted transaction. It can be any
     /// transaction and the VM will return an error if it has errors.
-    pub fn new_untrusted(transaction: UntrustedTransaction, block: HeaderParams) -> Result<Self, PreExecutionError> {
-        let valid = transaction.to_valid::<P>()?;
+    pub fn new_untrusted(patch: P, transaction: UntrustedTransaction, block: HeaderParams) -> Result<Self, PreExecutionError> {
+        patch.set_block_number(block.number);
+        let valid = transaction.to_valid(&patch)?;
         let mut vm = TransactionVM(TransactionVMState::Constructing {
+            patch,
             transaction: valid,
             block,
             account_state: AccountState::default(),
@@ -324,35 +327,14 @@ impl<M: Memory + Default, P: Patch> TransactionVM<M, P> {
 
     /// Create a new VM using the given transaction, block header and
     /// patch. This VM runs at the transaction level.
-    pub fn new(transaction: ValidTransaction, block: HeaderParams) -> Self {
+    pub fn new(patch: P, transaction: ValidTransaction, block: HeaderParams) -> Self {
+        patch.set_block_number(block.number);
         TransactionVM(TransactionVMState::Constructing {
+            patch,
             transaction,
             block,
             account_state: AccountState::default(),
             blockhash_state: BlockhashState::default(),
-        })
-    }
-
-    /// Create a new VM with the result of the previous VM. This is
-    /// usually used by transaction for chaining them.
-    pub fn with_previous(
-        transaction: ValidTransaction, block: HeaderParams, vm: &TransactionVM<M, P>
-    ) -> Self {
-        TransactionVM(TransactionVMState::Constructing {
-            transaction,
-            block,
-            account_state: match vm.0 {
-                TransactionVMState::Constructing { ref account_state, .. } =>
-                    account_state.clone(),
-                TransactionVMState::Running { ref vm, .. } =>
-                    vm.machines[0].state().account_state.clone(),
-            },
-            blockhash_state: match vm.0 {
-                TransactionVMState::Constructing { ref blockhash_state, .. } =>
-                    blockhash_state.clone(),
-                TransactionVMState::Running { ref vm, .. } =>
-                    vm.runtime.blockhash_state.clone(),
-            },
         })
     }
 
@@ -372,7 +354,32 @@ impl<M: Memory + Default, P: Patch> TransactionVM<M, P> {
     }
 }
 
-impl<M: Memory + Default, P: Patch> VM for TransactionVM<M, P> {
+impl<M: Memory, P: Patch + Clone> TransactionVM<M, P> {
+    /// Create a new VM with the result of the previous VM. This is
+    /// usually used by transaction for chaining them.
+    pub fn with_previous(
+        transaction: ValidTransaction, block: HeaderParams, vm: &TransactionVM<M, P>
+    ) -> Self {
+        let (patch, account_state, blockhash_state) = match vm.0 {
+            TransactionVMState::Constructing { ref patch, ref account_state, ref blockhash_state, .. } =>
+                (patch.clone(), account_state.clone(), blockhash_state.clone()),
+            TransactionVMState::Running { ref vm, .. } => {
+                let state = vm.machines[0].state();
+                (state.patch.clone(), state.account_state.clone(), vm.runtime.blockhash_state.clone())
+            }
+        };
+
+        TransactionVM(TransactionVMState::Constructing {
+            patch,
+            transaction,
+            block,
+            account_state,
+            blockhash_state,
+        })
+    }
+}
+
+impl<M: Memory, P: Patch + Clone> VM for TransactionVM<M, P> {
     fn commit_account(&mut self, commitment: AccountCommitment) -> Result<(), CommitError> {
         match self.0 {
             TransactionVMState::Running { ref mut vm, .. } => vm.commit_account(commitment),
@@ -415,6 +422,7 @@ impl<M: Memory + Default, P: Patch> VM for TransactionVM<M, P> {
     }
 
     fn step(&mut self) -> Result<(), RequireError> {
+        let cpatch: P;
         let cgas: Gas;
         let ccontext: Context;
         let cblock: HeaderParams;
@@ -461,6 +469,7 @@ impl<M: Memory + Default, P: Patch> VM for TransactionVM<M, P> {
                 }
             }
             TransactionVMState::Constructing {
+                ref patch,
                 ref transaction, ref block,
                 ref mut account_state, ref blockhash_state } => {
 
@@ -471,7 +480,8 @@ impl<M: Memory + Default, P: Patch> VM for TransactionVM<M, P> {
                     TransactionAction::Create | TransactionAction::Create2(..) => true,
                     TransactionAction::Call(_) => false,
                 };
-                cgas = transaction.intrinsic_gas::<P>();
+                cpatch = patch.clone();
+                cgas = transaction.intrinsic_gas(cpatch.gas_transaction_create());
                 cpreclaimed_value = transaction.preclaimed_value();
                 ccontext = transaction.clone().into_context::<P>(cgas, None, account_state, false, false)?;
                 cblock = block.clone();
@@ -482,6 +492,7 @@ impl<M: Memory + Default, P: Patch> VM for TransactionVM<M, P> {
 
         let account_state = caccount_state;
         let vm = ContextVM::with_init(
+            cpatch,
             ccontext, cblock,
             account_state.clone(),
             cblockhash_state,
@@ -577,6 +588,7 @@ mod tests {
 
     #[test]
     fn system_transaction() {
+        let patch = EmbeddedPatch::default();
         let transaction = ValidTransaction {
             caller: None,
             gas_price: Gas::zero(),
@@ -586,7 +598,7 @@ mod tests {
             input: Rc::new(Vec::new()),
             nonce: U256::zero(),
         };
-        let mut vm = SeqTransactionVM::<EmbeddedPatch>::new(transaction, HeaderParams {
+        let mut vm = SeqTransactionVM::new(patch, transaction, HeaderParams {
             beneficiary: Address::default(),
             timestamp: 0,
             number: U256::zero(),
@@ -623,7 +635,7 @@ mod tests {
             input: Rc::new(Vec::new()),
             nonce: U256::zero(),
         };
-        let mut vm = SeqTransactionVM::<EmbeddedPatch>::new(transaction, HeaderParams {
+        let mut vm = SeqTransactionVM::new(EmbeddedPatch::default(), transaction, HeaderParams {
             beneficiary: Address::default(),
             timestamp: 0,
             number: U256::zero(),

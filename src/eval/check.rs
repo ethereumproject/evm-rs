@@ -9,10 +9,10 @@ use eval::{State, Runtime, ControlCheck};
 use super::util::check_range;
 
 #[allow(unused_variables)]
-pub fn extra_check_opcode<M: Memory + Default, P: Patch>(instruction: Instruction, state: &State<M, P>, stipend_gas: Gas, after_gas: Gas) -> Result<(), OnChainError> {
+pub fn extra_check_opcode<M: Memory, P: Patch>(instruction: Instruction, state: &State<M, P>, stipend_gas: Gas, after_gas: Gas) -> Result<(), OnChainError> {
     match instruction {
         Instruction::CALL | Instruction::CALLCODE | Instruction::DELEGATECALL => {
-            if P::err_on_call_with_more_gas() && after_gas < state.stack.peek(0).unwrap().into() {
+            if state.patch.err_on_call_with_more_gas() && after_gas < state.stack.peek(0).unwrap().into() {
                 Err(OnChainError::EmptyGas)
             } else {
                 Ok(())
@@ -22,7 +22,7 @@ pub fn extra_check_opcode<M: Memory + Default, P: Patch>(instruction: Instructio
     }
 }
 
-pub fn check_support<M: Memory + Default, P: Patch>(instruction: Instruction, state: &State<M, P>) -> Result<(), NotSupportedError> {
+pub fn check_support<M: Memory, P: Patch>(instruction: Instruction, state: &State<M, P>) -> Result<(), NotSupportedError> {
     match instruction {
         Instruction::MSTORE => {
             state.memory.check_write(state.stack.peek(0).unwrap().into())?;
@@ -68,7 +68,7 @@ pub fn check_support<M: Memory + Default, P: Patch>(instruction: Instruction, st
 
 #[allow(unused_variables)]
 /// Check whether `run_opcode` would be static.
-pub fn check_static<M: Memory + Default, P: Patch>(instruction: Instruction, state: &State<M, P>, runtime: &Runtime) -> Result<(), EvalOnChainError> {
+pub fn check_static<M: Memory, P: Patch>(instruction: Instruction, state: &State<M, P>, runtime: &Runtime) -> Result<(), EvalOnChainError> {
     match instruction {
         Instruction::STOP |
         Instruction::ADD |
@@ -167,7 +167,7 @@ pub fn check_static<M: Memory + Default, P: Patch>(instruction: Instruction, sta
 #[allow(unused_variables)]
 /// Check whether `run_opcode` would fail without mutating any of the
 /// machine state.
-pub fn check_opcode<M: Memory + Default, P: Patch>(instruction: Instruction, state: &State<M, P>, runtime: &Runtime) -> Result<Option<ControlCheck>, EvalOnChainError> {
+pub fn check_opcode<M: Memory, P: Patch>(instruction: Instruction, state: &State<M, P>, runtime: &Runtime) -> Result<Option<ControlCheck>, EvalOnChainError> {
     match instruction {
         Instruction::STOP => Ok(None),
         Instruction::ADD => { state.stack.check_pop_push(2, 1)?; Ok(None) },

@@ -6,9 +6,7 @@ use alloc::vec::Vec;
 use bigint::M256;
 use util::opcode::Opcode;
 #[cfg(feature = "std")] use std::cmp::min;
-#[cfg(feature = "std")] use std::marker::PhantomData;
 #[cfg(not(feature = "std"))] use core::cmp::min;
-#[cfg(not(feature = "std"))] use core::marker::PhantomData;
 
 use super::Patch;
 use super::errors::OnChainError;
@@ -91,7 +89,7 @@ pub struct PC<'a, P: Patch> {
     position: &'a usize,
     code: &'a [u8],
     valids: &'a Valids,
-    _patch: PhantomData<P>,
+    patch: &'a P,
 }
 
 /// Represents a mutable program counter in EVM.
@@ -99,7 +97,7 @@ pub struct PCMut<'a, P: Patch> {
     position: &'a mut usize,
     code: &'a [u8],
     valids: &'a Valids,
-    _patch: PhantomData<P>,
+    patch: &'a P,
 }
 
 macro_rules! impl_pc {
@@ -195,21 +193,21 @@ macro_rules! impl_pc {
                     Opcode::BYTE => Instruction::BYTE,
 
                     Opcode::SHL => {
-                        if P::has_bitwise_shift() {
+                        if self.patch.has_bitwise_shift() {
                             Instruction::SHL
                         } else {
                             return Err(OnChainError::InvalidOpcode);
                         }
                     },
                     Opcode::SHR => {
-                        if P::has_bitwise_shift() {
+                        if self.patch.has_bitwise_shift() {
                             Instruction::SHR
                         } else {
                             return Err(OnChainError::InvalidOpcode);
                         }
                     },
                     Opcode::SAR => {
-                        if P::has_bitwise_shift() {
+                        if self.patch.has_bitwise_shift() {
                             Instruction::SAR
                         } else {
                             return Err(OnChainError::InvalidOpcode);
@@ -268,35 +266,35 @@ macro_rules! impl_pc {
                     Opcode::CALLCODE => Instruction::CALLCODE,
                     Opcode::RETURN => Instruction::RETURN,
                     Opcode::DELEGATECALL => {
-                        if P::has_delegate_call() {
+                        if self.patch.has_delegate_call() {
                             Instruction::DELEGATECALL
                         } else {
                             return Err(OnChainError::InvalidOpcode);
                         }
                     },
                     Opcode::STATICCALL => {
-                        if P::has_static_call() {
+                        if self.patch.has_static_call() {
                             Instruction::STATICCALL
                         } else {
                             return Err(OnChainError::InvalidOpcode);
                         }
                     },
                     Opcode::REVERT => {
-                        if P::has_revert() {
+                        if self.patch.has_revert() {
                             Instruction::REVERT
                         } else {
                             return Err(OnChainError::InvalidOpcode);
                         }
                     },
                     Opcode::RETURNDATASIZE => {
-                        if P::has_return_data() {
+                        if self.patch.has_return_data() {
                             Instruction::RETURNDATASIZE
                         } else {
                             return Err(OnChainError::InvalidOpcode);
                         }
                     },
                     Opcode::RETURNDATACOPY => {
-                        if P::has_return_data() {
+                        if self.patch.has_return_data() {
                             Instruction::RETURNDATACOPY
                         } else {
                             return Err(OnChainError::InvalidOpcode);
@@ -318,20 +316,20 @@ impl_pc!(PCMut);
 
 impl<'a, P: Patch> PC<'a, P> {
     /// Create a new program counter from the given code.
-    pub fn new(code: &'a [u8], valids: &'a Valids, position: &'a usize) -> Self {
+    pub fn new(patch: &'a P, code: &'a [u8], valids: &'a Valids, position: &'a usize) -> Self {
         Self {
             code, valids, position,
-            _patch: PhantomData,
+            patch,
         }
     }
 }
 
 impl<'a, P: Patch> PCMut<'a, P> {
     /// Create a new program counter from the given code.
-    pub fn new(code: &'a [u8], valids: &'a Valids, position: &'a mut usize) -> Self {
+    pub fn new(patch: &'a P, code: &'a [u8], valids: &'a Valids, position: &'a mut usize) -> Self {
         Self {
             code, valids, position,
-            _patch: PhantomData,
+            patch,
         }
     }
 

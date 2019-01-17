@@ -6,7 +6,7 @@ use ::Memory;
 use super::State;
 use patch::Patch;
 
-pub fn addmod<M: Memory + Default, P: Patch>(state: &mut State<M, P>) {
+pub fn addmod<M: Memory, P: Patch>(state: &mut State<M, P>) {
     pop!(state, op1: U512, op2: U512, op3: U512);
 
     if op3 == U512::zero() {
@@ -17,7 +17,7 @@ pub fn addmod<M: Memory + Default, P: Patch>(state: &mut State<M, P>) {
     }
 }
 
-pub fn mulmod<M: Memory + Default, P: Patch>(state: &mut State<M, P>) {
+pub fn mulmod<M: Memory, P: Patch>(state: &mut State<M, P>) {
     pop!(state, op1: U512, op2: U512, op3: U512);
 
     if op3 == U512::zero() {
@@ -29,7 +29,7 @@ pub fn mulmod<M: Memory + Default, P: Patch>(state: &mut State<M, P>) {
 }
 
 
-pub fn exp<M: Memory + Default, P: Patch>(state: &mut State<M, P>) {
+pub fn exp<M: Memory, P: Patch>(state: &mut State<M, P>) {
     pop!(state, op1, op2);
     let mut op1 = op1;
     let mut op2 = op2;
@@ -46,7 +46,7 @@ pub fn exp<M: Memory + Default, P: Patch>(state: &mut State<M, P>) {
     push!(state, r);
 }
 
-pub fn signextend<M: Memory + Default, P: Patch>(state: &mut State<M, P>) {
+pub fn signextend<M: Memory, P: Patch>(state: &mut State<M, P>) {
     pop!(state, op1, op2);
 
     if op1 > M256::from(32) {

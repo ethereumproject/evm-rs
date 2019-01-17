@@ -8,7 +8,7 @@ use bigint::{H256, M256};
 use sha3::{Keccak256, Digest};
 
 
-pub fn calldataload<M: Memory + Default, P: Patch>(state: &mut State<M, P>) {
+pub fn calldataload<M: Memory, P: Patch>(state: &mut State<M, P>) {
     pop!(state, index);
     let index: Option<usize> = if index > usize::max_value().into() {
         None
@@ -25,7 +25,7 @@ pub fn calldataload<M: Memory + Default, P: Patch>(state: &mut State<M, P>) {
     push!(state, load.as_ref().into());
 }
 
-pub fn extcodehash<M: Memory + Default, P: Patch>(state: &mut State<M, P>) {
+pub fn extcodehash<M: Memory, P: Patch>(state: &mut State<M, P>) {
     pop!(state, address: Address);
 
     if let Some(code) = state.account_state.code_opt_nonexist(address).unwrap() {

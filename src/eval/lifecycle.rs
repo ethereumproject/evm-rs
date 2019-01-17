@@ -26,7 +26,7 @@ use super::cost::code_deposit_gas;
 /// should first call `code_deposit` if it is a contract creation
 /// transaction. After that, it should call `finalize`.
 
-impl<M: Memory + Default, P: Patch> Machine<M, P> {
+impl<M: Memory, P: Patch> Machine<M, P> {
     /// Initialize a MessageCall transaction.
     ///
     /// ### Panic
@@ -97,8 +97,8 @@ impl<M: Memory + Default, P: Patch> Machine<M, P> {
             _ => panic!(),
         }
 
-        if P::code_deposit_limit().is_some()  {
-            if self.state.out.len() > P::code_deposit_limit().unwrap() {
+        if self.state.patch.code_deposit_limit().is_some()  {
+            if self.state.out.len() > self.state.patch.code_deposit_limit().unwrap() {
                 reset_error_hard!(self, OnChainError::EmptyGas);
                 return;
             }
@@ -106,7 +106,7 @@ impl<M: Memory + Default, P: Patch> Machine<M, P> {
 
         let deposit_cost = code_deposit_gas(self.state.out.len());
         if deposit_cost > self.state.available_gas() {
-            if !P::force_code_deposit() {
+            if !self.state.patch.force_code_deposit() {
                 reset_error_hard!(self, OnChainError::EmptyGas);
             } else {
                 self.state.account_state.code_deposit(self.state.context.address, Rc::new(Vec::new()));

@@ -61,7 +61,7 @@ fn from_rpc_log(log: &RPCLog) -> Log {
     }
 }
 
-fn handle_fire<T: GethRPCClient, P: Patch>(client: &mut T, vm: &mut SeqTransactionVM<P>, last_block_id: usize) {
+fn handle_fire<T: GethRPCClient, P: Patch + Clone>(client: &mut T, vm: &mut SeqTransactionVM<P>, last_block_id: usize) {
     let last_block_number = format!("0x{:x}", last_block_id);
     loop {
         match vm.fire() {
@@ -143,7 +143,7 @@ fn is_miner_or_uncle<T: GethRPCClient>(client: &mut T, address: Address, block: 
     false
 }
 
-fn test_block<T: GethRPCClient, P: Patch>(client: &mut T, number: usize) {
+fn test_block<T: GethRPCClient, P: Patch + Default + Clone>(client: &mut T, number: usize) {
     let block = client.get_block_by_number(format!("0x{:x}", number).as_str()).unwrap();
     println!("block {} ({}), transaction count: {}", number, block.number.as_ref().unwrap(), block.transactions.len());
     let last_id = number - 1;
@@ -158,7 +158,7 @@ fn test_block<T: GethRPCClient, P: Patch>(client: &mut T, number: usize) {
         let receipt = client.get_transaction_receipt(&transaction_hash).unwrap();
 
         let mut vm = if last_vm.is_none() {
-            SeqTransactionVM::new(transaction, block_header.clone())
+            SeqTransactionVM::new(P::default(), transaction, block_header.clone())
         } else {
             SeqTransactionVM::with_previous(transaction, block_header.clone(), last_vm.as_ref().unwrap())
         };
@@ -248,7 +248,7 @@ fn test_blocks_patch<T: GethRPCClient>(client: &mut T, number: &str, patch: Opti
     }
 }
 
-fn test_blocks<T: GethRPCClient, P: Patch>(client: &mut T, number: &str) {
+fn test_blocks<T: GethRPCClient, P: Patch + Default + Clone>(client: &mut T, number: &str) {
     if number.contains(".json") {
         let file = File::open(number).unwrap();
         let numbers: Vec<usize> = serde_json::from_reader(file).unwrap();

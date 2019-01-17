@@ -222,14 +222,14 @@ impl<'b, D: DatabaseOwned> Stateful<'b, D> {
         }
     }
 
-    pub fn call<M: Memory + Default, P: Patch>(
-        &self, transaction: ValidTransaction, block: &HeaderParams,
+    pub fn call<M: Memory, P: Patch + Clone>(
+        &self, patch: P, transaction: ValidTransaction, block: &HeaderParams,
         most_recent_block_hashes: &[H256]
     ) -> TransactionVM<M, P> {
         assert!(U256::from(most_recent_block_hashes.len()) >=
                 min(block.number, U256::from(256)));
 
-        let mut vm = TransactionVM::new(transaction, block.clone());
+        let mut vm = TransactionVM::new(patch, transaction, block.clone());
         let state = self.database.create_fixed_secure_trie(self.root);
         let code_hashes = self.database.create_guard();
 
@@ -423,11 +423,11 @@ impl<'b, D: DatabaseOwned> Stateful<'b, D> {
         self.root = state.root();
     }
 
-    pub fn execute<M: Memory + Default, P: Patch>(
-        &mut self, transaction: ValidTransaction, block: &HeaderParams,
+    pub fn execute<M: Memory, P: Patch + Clone>(
+        &mut self, patch: P, transaction: ValidTransaction, block: &HeaderParams,
         most_recent_block_hashes: &[H256]
     ) -> TransactionVM<M, P> {
-        let vm = self.call::<_, P>(transaction, &block, most_recent_block_hashes);
+        let vm = self.call::<_, P>(patch, transaction, &block, most_recent_block_hashes);
         let mut accounts = Vec::new();
         for account in vm.accounts() {
             accounts.push(account.clone());
@@ -437,14 +437,14 @@ impl<'b, D: DatabaseOwned> Stateful<'b, D> {
     }
 
     pub fn to_valid<P: Patch>(
-        &self, transaction: &Transaction,
+        &self, patch: &P, transaction: &Transaction,
     ) -> Result<ValidTransaction, PreExecutionError> {
         let state = self.database.create_fixed_secure_trie(self.root);
         let code_hashes = self.database.create_guard();
         let mut account_state = AccountState::default();
 
         loop {
-            match ValidTransaction::from_transaction::<P>(transaction, &account_state) {
+            match ValidTransaction::from_transaction(patch, transaction, &account_state) {
                 Ok(val) => return val,
                 Err(RequireError::Account(address)) => {
                     let account: Option<Account> = state.get(&address);
