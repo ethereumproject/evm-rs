@@ -259,7 +259,6 @@ pub struct ContextVM<M, P: Patch> {
 impl<M: Memory, P: Patch> ContextVM<M, P> {
     /// Create a new VM using the given context, block header and patch.
     pub fn new(patch: P, context: Context, block: HeaderParams) -> Self {
-        patch.set_block_number(block.number);
         let mut machines = Vec::new();
         machines.push(Machine::new(patch, context, 1));
         ContextVM {
@@ -272,7 +271,6 @@ impl<M: Memory, P: Patch> ContextVM<M, P> {
     /// Create a new VM with the given account state and blockhash state.
     pub fn with_states(patch: P, context: Context, block: HeaderParams,
                        account_state: AccountState<P::Account>, blockhash_state: BlockhashState) -> Self {
-        patch.set_block_number(block.number);
         let mut machines = Vec::new();
         machines.push(Machine::with_states(patch, context, 1, account_state.clone()));
         ContextVM {

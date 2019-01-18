@@ -312,7 +312,6 @@ impl<M: Memory, P: Patch + Clone> TransactionVM<M, P> {
     /// Create a VM from an untrusted transaction. It can be any
     /// transaction and the VM will return an error if it has errors.
     pub fn new_untrusted(patch: P, transaction: UntrustedTransaction, block: HeaderParams) -> Result<Self, PreExecutionError> {
-        patch.set_block_number(block.number);
         let valid = transaction.to_valid(&patch)?;
         let mut vm = TransactionVM(TransactionVMState::Constructing {
             patch,
@@ -328,7 +327,6 @@ impl<M: Memory, P: Patch + Clone> TransactionVM<M, P> {
     /// Create a new VM using the given transaction, block header and
     /// patch. This VM runs at the transaction level.
     pub fn new(patch: P, transaction: ValidTransaction, block: HeaderParams) -> Self {
-        patch.set_block_number(block.number);
         TransactionVM(TransactionVMState::Constructing {
             patch,
             transaction,

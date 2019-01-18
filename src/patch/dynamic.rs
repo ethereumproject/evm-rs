@@ -145,10 +145,6 @@ macro_rules! delegate_patch_methods {
 impl<A: AccountPatch> Patch for DynamicPatch<A> {
     type Account = A;
 
-    fn set_block_number(&self, block_number: U256) {
-        self.block_number.set(block_number)
-    }
-
     fn precompileds(&self) -> &[(Address, Option<&[u8]>, &dyn Precompiled)] {
         self.current_patch().precompileds()
     }

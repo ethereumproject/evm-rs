@@ -46,8 +46,6 @@ pub trait Patch {
     /// Account patch
     type Account: AccountPatch;
 
-    /// Unimplemented by default for backward-compatibility with static patches
-    fn set_block_number(&self, _block_number: U256) {}
     /// Maximum contract size.
     fn code_deposit_limit(&self) -> Option<usize>;
     /// Limit of the call stack.
