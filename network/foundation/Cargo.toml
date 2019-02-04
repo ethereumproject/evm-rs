@@ -4,7 +4,7 @@ version = "0.11.0-beta.0"
 description = "Ethereum patches for SputnikVM."
 license = "Apache-2.0"
 authors = ["Wei Tang <hi@that.world>"]
-repository = "https://github.com/ETCDEVTeam/evm"
+repository = "https://github.com/etclabscore/sputnikvm"
 
 [dependencies]
 evm = { version = "0.11.0-beta", path = "../..", default-features = false }
