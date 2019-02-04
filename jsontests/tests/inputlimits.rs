@@ -3,7 +3,6 @@
 extern crate evm;
 extern crate jsontests;
 extern crate serde_json;
-
 use evm::VMTestPatch;
 use jsontests::test_transaction;
 use serde_json::Value;

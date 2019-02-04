@@ -7,6 +7,9 @@ description = "SputnikVM - a Portable Blockchain Virtual Machine"
 repository = "https://github.com/etclabscore/sputnikvm"
 keywords = ["no_std", "ethereum"]
 
+[lib]
+name = "evm"
+
 [dependencies]
 sha3 = "0.6"
 sha2 = "0.6"

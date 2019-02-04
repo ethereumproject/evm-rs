@@ -6,7 +6,7 @@ extern crate evm_precompiled_bn128;
 use std::marker::PhantomData;
 use bigint::{Gas, U256, H160, Address};
 use evm::{Precompiled, AccountPatch, Patch,
-          ID_PRECOMPILED, ECREC_PRECOMPILED, SHA256_PRECOMPILED, RIP160_PRECOMPILED};
+                ID_PRECOMPILED, ECREC_PRECOMPILED, SHA256_PRECOMPILED, RIP160_PRECOMPILED};
 use evm_precompiled_modexp::MODEXP_PRECOMPILED;
 use evm_precompiled_bn128::{BN128_ADD_PRECOMPILED, BN128_MUL_PRECOMPILED, BN128_PAIRING_PRECOMPILED};
 

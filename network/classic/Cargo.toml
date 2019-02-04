@@ -18,4 +18,3 @@ rlp = ["ethereum-bigint/rlp"]
 c-secp256k1 = ["evm/c-secp256k1", "evm-precompiled-bn128/c-secp256k1", "evm-precompiled-modexp/c-secp256k1"]
 rust-secp256k1 = ["evm/rust-secp256k1", "evm-precompiled-bn128/rust-secp256k1", "evm-precompiled-modexp/rust-secp256k1"]
 std = ["evm/std"]
-

@@ -70,5 +70,6 @@ impl Patch for EIP1283Patch {
     fn call_create_l64_after_gas(&self) -> bool { false }
     fn memory_limit(&self) -> usize { usize::max_value() }
     fn precompileds(&self) -> &'static [(Address, Option<&'static [u8]>, &'static Precompiled)] {
-        &EMBEDDED_PRECOMPILEDS }
+        &EMBEDDED_PRECOMPILEDS
+    }
 }

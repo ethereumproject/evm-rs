@@ -1,4 +1,3 @@
-#![cfg_attr(feature = "bench", feature(test))]
 extern crate evm;
 extern crate serde_json;
 extern crate hexutil;

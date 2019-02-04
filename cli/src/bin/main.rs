@@ -12,18 +12,14 @@ mod profiler;
 
 use std::fs::File;
 
-use bigint::{Address, Gas, H256, M256, U256};
-use evm::{
-    AccountCommitment, Context, HeaderParams, RequireError, SeqContextVM, SeqTransactionVM,
-    TransactionAction, VMStatus, ValidTransaction, VM,
-};
-use evm_network_classic::{
-    MainnetByzantiumPatch, MainnetConstantinoplePatch, MainnetEIP150Patch, MainnetEIP160Patch,
-    MainnetFrontierPatch, MainnetHomesteadPatch,
-};
-use gethrpc::{GethRPCClient, NormalGethRPCClient, RPCBlock};
-use hexutil::read_hex;
 use profiler::Profiler;
+use bigint::{Gas, Address, U256, M256, H256};
+use hexutil::read_hex;
+use evm::{HeaderParams, Context, SeqTransactionVM, ValidTransaction, VM,
+                AccountCommitment, RequireError, TransactionAction, VMStatus,
+                SeqContextVM};
+use evm_network_classic::{MainnetFrontierPatch, MainnetHomesteadPatch, MainnetEIP150Patch, MainnetEIP160Patch, MainnetByzantiumPatch, MainnetConstantinoplePatch};
+use gethrpc::{GethRPCClient, NormalGethRPCClient, RPCBlock};
 use std::ops::DerefMut;
 use std::rc::Rc;
 use std::str::FromStr;
