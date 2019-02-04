@@ -308,16 +308,17 @@ enum TransactionVMState<M, P: Patch> {
 /// A VM that executes using a transaction and block information.
 pub struct TransactionVM<M, P: Patch>(TransactionVMState<M, P>);
 
-impl<M: Memory, P: Patch + Clone> TransactionVM<M, P> {
+impl<M: Memory, P: Patch> TransactionVM<M, P> {
     /// Create a VM from an untrusted transaction. It can be any
     /// transaction and the VM will return an error if it has errors.
     pub fn new_untrusted(patch: P, transaction: UntrustedTransaction, block: HeaderParams) -> Result<Self, PreExecutionError> {
         let valid = transaction.to_valid(&patch)?;
+        let account_patch = patch.account_patch().clone();
         let mut vm = TransactionVM(TransactionVMState::Constructing {
             patch,
             transaction: valid,
             block,
-            account_state: AccountState::default(),
+            account_state: AccountState::new(account_patch),
             blockhash_state: BlockhashState::default(),
         });
         vm.commit_account(transaction.caller).unwrap();
@@ -327,11 +328,12 @@ impl<M: Memory, P: Patch + Clone> TransactionVM<M, P> {
     /// Create a new VM using the given transaction, block header and
     /// patch. This VM runs at the transaction level.
     pub fn new(patch: P, transaction: ValidTransaction, block: HeaderParams) -> Self {
+        let account_patch = patch.account_patch().clone();
         TransactionVM(TransactionVMState::Constructing {
             patch,
             transaction,
             block,
-            account_state: AccountState::default(),
+            account_state: AccountState::new(account_patch),
             blockhash_state: BlockhashState::default(),
         })
     }

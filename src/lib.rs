@@ -260,11 +260,12 @@ impl<M: Memory, P: Patch> ContextVM<M, P> {
     /// Create a new VM using the given context, block header and patch.
     pub fn new(patch: P, context: Context, block: HeaderParams) -> Self {
         let mut machines = Vec::new();
+        let account_patch = patch.account_patch().clone();
         machines.push(Machine::new(patch, context, 1));
         ContextVM {
             machines,
             runtime: Runtime::new(block),
-            fresh_account_state: AccountState::default(),
+            fresh_account_state: AccountState::new(account_patch),
         }
     }
 

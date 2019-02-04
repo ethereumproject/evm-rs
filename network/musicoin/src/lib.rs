@@ -1,17 +1,17 @@
 extern crate bigint;
 extern crate evm;
 
-use std::marker::PhantomData;
 use bigint::{Gas, U256, H160, Address};
 use evm::{Precompiled, AccountPatch, Patch,
           ID_PRECOMPILED, ECREC_PRECOMPILED, SHA256_PRECOMPILED, RIP160_PRECOMPILED};
 
 /// Mainnet account patch
+#[derive(Debug, Default, Copy, Clone)]
 pub struct MainnetAccountPatch;
 impl AccountPatch for MainnetAccountPatch {
-    fn initial_nonce() -> U256 { U256::zero() }
-    fn initial_create_nonce() -> U256 { Self::initial_nonce() }
-    fn empty_considered_exists() -> bool { true }
+    fn initial_nonce(&self) -> U256 { U256::zero() }
+    fn initial_create_nonce(&self) -> U256 { self.initial_nonce() }
+    fn empty_considered_exists(&self) -> bool { true }
 }
 
 pub static MUSIC_PRECOMPILEDS: [(Address, Option<&'static [u8]>, &'static Precompiled); 4] = [
@@ -30,11 +30,13 @@ pub static MUSIC_PRECOMPILEDS: [(Address, Option<&'static [u8]>, &'static Precom
 ];
 
 /// Frontier patch.
-pub struct FrontierPatch<A: AccountPatch>(PhantomData<A>);
+#[derive(Debug, Copy, Clone, Default)]
+pub struct FrontierPatch<A: AccountPatch>(A);
 pub type MainnetFrontierPatch = FrontierPatch<MainnetAccountPatch>;
 impl<A: AccountPatch> Patch for FrontierPatch<A> {
     type Account = A;
 
+    fn account_patch(&self) -> &Self::Account { &self.0 }
     fn code_deposit_limit(&self) -> Option<usize> { None }
     fn callstack_limit(&self) -> usize { 1024 }
     fn gas_extcode(&self) -> Gas { Gas::from(20usize) }
@@ -61,11 +63,13 @@ impl<A: AccountPatch> Patch for FrontierPatch<A> {
 }
 
 /// Homestead patch.
-pub struct HomesteadPatch<A: AccountPatch>(PhantomData<A>);
+#[derive(Debug, Copy, Clone, Default)]
+pub struct HomesteadPatch<A: AccountPatch>(A);
 pub type MainnetHomesteadPatch = HomesteadPatch<MainnetAccountPatch>;
 impl<A: AccountPatch> Patch for HomesteadPatch<A> {
     type Account = A;
 
+    fn account_patch(&self) -> &Self::Account { &self.0 }
     fn code_deposit_limit(&self) -> Option<usize> { None }
     fn callstack_limit(&self) -> usize { 1024 }
     fn gas_extcode(&self) -> Gas { Gas::from(20usize) }

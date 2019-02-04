@@ -5,21 +5,22 @@ mod precompiled;
 mod dynamic;
 
 pub use self::precompiled::*;
+pub use self::dynamic::*;
 
 use bigint::{Address, Gas, U256, H160};
 
 /// Account patch for account related variables.
 /// Account patch is always static, as it's usually stays constant for any given network.
-pub trait AccountPatch {
+pub trait AccountPatch: Clone {
     /// Initial nonce for accounts.
-    fn initial_nonce() -> U256;
+    fn initial_nonce(&self) -> U256;
     /// Initial create nonce for accounts. (EIP161.a)
-    fn initial_create_nonce() -> U256;
+    fn initial_create_nonce(&self) -> U256;
     /// Whether empty accounts are considered to be existing. (EIP161.b/EIP161.c/EIP161.d)
-    fn empty_considered_exists() -> bool;
+    fn empty_considered_exists(&self) -> bool;
     /// Whether to allow partial change IncreaseBalance.
-    fn allow_partial_change() -> bool {
-        Self::empty_considered_exists()
+    fn allow_partial_change(&self) -> bool {
+        self.empty_considered_exists()
     }
 }
 
@@ -27,25 +28,18 @@ pub trait AccountPatch {
 #[derive(Default, Copy, Clone)]
 pub struct EmbeddedAccountPatch;
 impl AccountPatch for EmbeddedAccountPatch {
-    fn initial_nonce() -> U256 { U256::zero() }
-    fn initial_create_nonce() -> U256 { Self::initial_nonce() }
-    fn empty_considered_exists() -> bool { true }
-}
-
-/// Mainnet account patch
-#[derive(Default, Copy, Clone)]
-pub struct EmbeddedByzantiumAccountPatch;
-impl AccountPatch for EmbeddedByzantiumAccountPatch {
-    fn initial_nonce() -> U256 { U256::zero() }
-    fn initial_create_nonce() -> U256 { Self::initial_nonce() + U256::one() }
-    fn empty_considered_exists() -> bool { false }
+    fn initial_nonce(&self) -> U256 { U256::zero() }
+    fn initial_create_nonce(&self) -> U256 { self.initial_nonce() }
+    fn empty_considered_exists(&self) -> bool { true }
 }
 
 /// Represents different block range context.
-pub trait Patch {
+pub trait Patch: Clone {
     /// Account patch
     type Account: AccountPatch;
 
+    /// Get account patch
+    fn account_patch(&self) -> &Self::Account;
     /// Maximum contract size.
     fn code_deposit_limit(&self) -> Option<usize>;
     /// Limit of the call stack.
@@ -116,11 +110,12 @@ pub static EMBEDDED_PRECOMPILEDS: [(Address, Option<&'static [u8]>, &'static dyn
 
 /// Patch sepcific for the `jsontests` crate.
 #[derive(Default, Copy, Clone)]
-pub struct VMTestPatch(EmbeddedAccountPatch);
+pub struct VMTestPatch(pub EmbeddedAccountPatch);
 
 impl Patch for VMTestPatch {
     type Account = EmbeddedAccountPatch;
 
+    fn account_patch(&self) -> &Self::Account { &self.0 }
     fn code_deposit_limit(&self) -> Option<usize> { None }
     fn callstack_limit(&self) -> usize { 2 }
     fn gas_extcode(&self) -> Gas { Gas::from(20usize) }
@@ -149,11 +144,12 @@ impl Patch for VMTestPatch {
 
 /// Embedded patch.
 #[derive(Default, Copy, Clone)]
-pub struct EmbeddedPatch(EmbeddedAccountPatch);
+pub struct EmbeddedPatch(pub EmbeddedAccountPatch);
 
 impl Patch for EmbeddedPatch {
     type Account = EmbeddedAccountPatch;
 
+    fn account_patch(&self) -> &Self::Account { &self.0 }
     fn code_deposit_limit(&self) -> Option<usize> { None }
     fn callstack_limit(&self) -> usize { 1024 }
     fn gas_extcode(&self) -> Gas { Gas::from(700usize) }

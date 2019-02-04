@@ -1,7 +1,6 @@
 extern crate bigint;
 extern crate evm;
 
-use std::marker::PhantomData;
 use bigint::{Gas, U256, H160, Address};
 use evm::{Precompiled, AccountPatch, Patch,
           ID_PRECOMPILED, ECREC_PRECOMPILED, SHA256_PRECOMPILED, RIP160_PRECOMPILED};
@@ -22,19 +21,22 @@ pub static ELLA_PRECOMPILEDS: [(Address, Option<&'static [u8]>, &'static Precomp
 ];
 
 /// Mainnet account patch
+#[derive(Debug, Copy, Clone, Default)]
 pub struct MainnetAccountPatch;
 impl AccountPatch for MainnetAccountPatch {
-    fn initial_nonce() -> U256 { U256::zero() }
-    fn initial_create_nonce() -> U256 { Self::initial_nonce() }
-    fn empty_considered_exists() -> bool { true }
+    fn initial_nonce(&self) -> U256 { U256::zero() }
+    fn initial_create_nonce(&self) -> U256 { self.initial_nonce() }
+    fn empty_considered_exists(&self) -> bool { true }
 }
 
 /// EIP160 patch.
-pub struct EIP160Patch<A: AccountPatch>(PhantomData<A>);
+#[derive(Debug, Copy, Clone, Default)]
+pub struct EIP160Patch<A: AccountPatch>(A);
 pub type MainnetEIP160Patch = EIP160Patch<MainnetAccountPatch>;
 impl<A: AccountPatch> Patch for EIP160Patch<A> {
     type Account = A;
 
+    fn account_patch(&self) -> &Self::Account { &self.0 }
     fn code_deposit_limit(&self) -> Option<usize> { None }
     fn callstack_limit(&self) -> usize { 1024 }
     fn gas_extcode(&self) -> Gas { Gas::from(700usize) }

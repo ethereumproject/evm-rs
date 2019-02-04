@@ -44,10 +44,11 @@ struct EIP1014;
 struct EIP1283;
 
 #[derive(Copy, Clone, Default)]
-struct EIP1283Patch;
+struct EIP1283Patch(pub EmbeddedAccountPatch);
 impl Patch for EIP1283Patch {
     type Account = EmbeddedAccountPatch;
 
+    fn account_patch(&self) -> &Self::Account { &self.0 }
     fn code_deposit_limit(&self) -> Option<usize> { None }
     fn callstack_limit(&self) -> usize { 2 }
     fn gas_extcode(&self) -> Gas { Gas::from(20usize) }

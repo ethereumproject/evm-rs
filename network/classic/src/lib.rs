@@ -14,17 +14,17 @@ use evm_precompiled_bn128::{BN128_ADD_PRECOMPILED, BN128_MUL_PRECOMPILED, BN128_
 #[derive(Copy, Clone, Default)]
 pub struct MainnetAccountPatch;
 impl AccountPatch for MainnetAccountPatch {
-    fn initial_nonce() -> U256 { U256::zero() }
-    fn initial_create_nonce() -> U256 { Self::initial_nonce() }
-    fn empty_considered_exists() -> bool { true }
+    fn initial_nonce(&self) -> U256 { U256::zero() }
+    fn initial_create_nonce(&self) -> U256 { self.initial_nonce() }
+    fn empty_considered_exists(&self) -> bool { true }
 }
 
 #[derive(Copy, Clone, Default)]
 pub struct MordenAccountPatch;
 impl AccountPatch for MordenAccountPatch {
-    fn initial_nonce() -> U256 { U256::from(1048576) }
-    fn initial_create_nonce() -> U256 { Self::initial_nonce() }
-    fn empty_considered_exists() -> bool { true }
+    fn initial_nonce(&self) -> U256 { U256::from(1048576) }
+    fn initial_create_nonce(&self) -> U256 { self.initial_nonce() }
+    fn empty_considered_exists(&self) -> bool { true }
 }
 
 pub static ETC_PRECOMPILEDS: [(Address, Option<&'static [u8]>, &'static Precompiled); 4] = [
@@ -71,12 +71,13 @@ pub static BYZANTIUM_PRECOMPILEDS: [(Address, Option<&'static [u8]>, &'static Pr
 
 /// Frontier patch.
 #[derive(Copy, Clone, Default)]
-pub struct FrontierPatch<A: AccountPatch>(PhantomData<A>);
+pub struct FrontierPatch<A: AccountPatch>(A);
 pub type MainnetFrontierPatch = FrontierPatch<MainnetAccountPatch>;
 pub type MordenFrontierPatch = FrontierPatch<MordenAccountPatch>;
 impl<A: AccountPatch> Patch for FrontierPatch<A> {
     type Account = A;
 
+    fn account_patch(&self) -> &Self::Account { &self.0 }
     fn code_deposit_limit(&self) -> Option<usize> { None }
     fn callstack_limit(&self) -> usize { 1024 }
     fn gas_extcode(&self) -> Gas { Gas::from(20usize) }
@@ -104,12 +105,13 @@ impl<A: AccountPatch> Patch for FrontierPatch<A> {
 
 /// Homestead patch.
 #[derive(Copy, Clone, Default)]
-pub struct HomesteadPatch<A: AccountPatch>(PhantomData<A>);
+pub struct HomesteadPatch<A: AccountPatch>(A);
 pub type MainnetHomesteadPatch = HomesteadPatch<MainnetAccountPatch>;
 pub type MordenHomesteadPatch = HomesteadPatch<MordenAccountPatch>;
 impl<A: AccountPatch> Patch for HomesteadPatch<A> {
     type Account = A;
 
+    fn account_patch(&self) -> &Self::Account { &self.0 }
     fn code_deposit_limit(&self) -> Option<usize> { None }
     fn callstack_limit(&self) -> usize { 1024 }
     fn gas_extcode(&self) -> Gas { Gas::from(20usize) }
@@ -137,12 +139,13 @@ impl<A: AccountPatch> Patch for HomesteadPatch<A> {
 
 /// EIP150 patch.
 #[derive(Copy, Clone, Default)]
-pub struct EIP150Patch<A: AccountPatch>(PhantomData<A>);
+pub struct EIP150Patch<A: AccountPatch>(A);
 pub type MainnetEIP150Patch = EIP150Patch<MainnetAccountPatch>;
 pub type MordenEIP150Patch = EIP150Patch<MordenAccountPatch>;
 impl<A: AccountPatch> Patch for EIP150Patch<A> {
     type Account = A;
 
+    fn account_patch(&self) -> &Self::Account { &self.0 }
     fn code_deposit_limit(&self) -> Option<usize> { None }
     fn callstack_limit(&self) -> usize { 1024 }
     fn gas_extcode(&self) -> Gas { Gas::from(700usize) }
@@ -170,12 +173,13 @@ impl<A: AccountPatch> Patch for EIP150Patch<A> {
 
 /// EIP160 patch.
 #[derive(Default, Copy, Clone)]
-pub struct EIP160Patch<A: AccountPatch>(PhantomData<A>);
+pub struct EIP160Patch<A: AccountPatch>(A);
 pub type MainnetEIP160Patch = EIP160Patch<MainnetAccountPatch>;
 pub type MordenEIP160Patch = EIP160Patch<MordenAccountPatch>;
 impl<A: AccountPatch> Patch for EIP160Patch<A> {
     type Account = A;
 
+    fn account_patch(&self) -> &Self::Account { &self.0 }
     fn code_deposit_limit(&self) -> Option<usize> { None }
     fn callstack_limit(&self) -> usize { 1024 }
     fn gas_extcode(&self) -> Gas { Gas::from(700usize) }
@@ -203,12 +207,13 @@ impl<A: AccountPatch> Patch for EIP160Patch<A> {
 
 /// Byzantium patch.
 #[derive(Copy, Clone, Default)]
-pub struct ByzantiumPatch<A: AccountPatch>(PhantomData<A>);
+pub struct ByzantiumPatch<A: AccountPatch>(A);
 pub type MainnetByzantiumPatch = ByzantiumPatch<MainnetAccountPatch>;
 pub type MordenByzantiumPatch = ByzantiumPatch<MordenAccountPatch>;
 impl<A: AccountPatch> Patch for ByzantiumPatch<A> {
     type Account = A;
 
+    fn account_patch(&self) -> &Self::Account { &self.0 }
     fn code_deposit_limit(&self) -> Option<usize> { None }
     fn callstack_limit(&self) -> usize { 1024 }
     fn gas_extcode(&self) -> Gas { Gas::from(700usize) }
@@ -237,12 +242,13 @@ impl<A: AccountPatch> Patch for ByzantiumPatch<A> {
 
 /// Constantinople patch (includes Byzantium changes)
 #[derive(Copy, Clone, Default)]
-pub struct ConstantinoplePatch<A: AccountPatch>(PhantomData<A>);
+pub struct ConstantinoplePatch<A: AccountPatch>(A);
 pub type MainnetConstantinoplePatch = ConstantinoplePatch<MainnetAccountPatch>;
 pub type MordenConstantinoplePatch = ConstantinoplePatch<MordenAccountPatch>;
 impl<A: AccountPatch> Patch for ConstantinoplePatch<A> {
     type Account = A;
 
+    fn account_patch(&self) -> &Self::Account { &self.0 }
     fn code_deposit_limit(&self) -> Option<usize> { None }
     fn callstack_limit(&self) -> usize { 1024 }
     fn gas_extcode(&self) -> Gas { Gas::from(700usize) }
@@ -267,3 +273,7 @@ impl<A: AccountPatch> Patch for ConstantinoplePatch<A> {
     fn precompileds(&self) -> &'static [(Address, Option<&'static [u8]>, &'static Precompiled)] {
         &BYZANTIUM_PRECOMPILEDS }
 }
+
+pub type MainnetDynamicPatch = DynamicPatch<MainnetAccountPatch>;
+pub type MordenDynamicPatch = DynamicPatch<MordenAccountPatch>;
+

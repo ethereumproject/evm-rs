@@ -441,7 +441,8 @@ impl<'b, D: DatabaseOwned> Stateful<'b, D> {
     ) -> Result<ValidTransaction, PreExecutionError> {
         let state = self.database.create_fixed_secure_trie(self.root);
         let code_hashes = self.database.create_guard();
-        let mut account_state = AccountState::default();
+        let account_patch = patch.account_patch().clone();
+        let mut account_state = AccountState::new(account_patch);
 
         loop {
             match ValidTransaction::from_transaction(patch, transaction, &account_state) {

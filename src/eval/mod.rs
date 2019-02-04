@@ -245,7 +245,8 @@ impl<M: Memory, P: Patch + Clone> Machine<M, P> {
 impl<M: Memory, P: Patch> Machine<M, P> {
     /// Create a new runtime.
     pub fn new(patch: P, context: Context, depth: usize) -> Self {
-        Self::with_states(patch, context, depth,AccountState::default())
+        let account_patch = patch.account_patch().clone();
+        Self::with_states(patch, context, depth,AccountState::new(account_patch))
     }
 
     /// Create a new runtime with the given states.

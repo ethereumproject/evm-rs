@@ -125,7 +125,7 @@ impl<M: Memory, P: Patch> Machine<M, P> {
     /// Requires caller of the transaction to be committed.
     pub fn finalize_transaction(&mut self, beneficiary: Address, real_used_gas: Gas, preclaimed_value: U256, fresh_account_state: &AccountState<P::Account>) -> Result<(), RequireError> {
         self.state.account_state.require(self.state.context.address)?;
-        if !P::Account::allow_partial_change() {
+        if !self.state.patch.account_patch().allow_partial_change() {
             self.state.account_state.require(beneficiary)?;
         }
 

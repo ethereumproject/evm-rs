@@ -51,25 +51,29 @@ pub static BYZANTIUM_PRECOMPILEDS: [(Address, Option<&'static [u8]>, &'static Pr
      &BN128_PAIRING_PRECOMPILED),
 ];
 
+#[derive(Debug, Copy, Clone, Default)]
 pub struct FrontierAccountPatch;
 impl AccountPatch for FrontierAccountPatch {
-    fn initial_nonce() -> U256 { U256::zero() }
-    fn initial_create_nonce() -> U256 { Self::initial_nonce() }
-    fn empty_considered_exists() -> bool { true }
+    fn initial_nonce(&self) -> U256 { U256::zero() }
+    fn initial_create_nonce(&self) -> U256 { self.initial_nonce() }
+    fn empty_considered_exists(&self) -> bool { true }
 }
 
+#[derive(Debug, Copy, Clone, Default)]
 pub struct StateClearingAccountPatch;
 impl AccountPatch for StateClearingAccountPatch {
-    fn initial_nonce() -> U256 { U256::zero() }
-    fn initial_create_nonce() -> U256 { Self::initial_nonce() + U256::from(1) }
-    fn empty_considered_exists() -> bool { false }
+    fn initial_nonce(&self) -> U256 { U256::zero() }
+    fn initial_create_nonce(&self) -> U256 { self.initial_nonce() + U256::from(1) }
+    fn empty_considered_exists(&self) -> bool { false }
 }
 
 /// Frontier patch.
-pub struct FrontierPatch;
+#[derive(Debug, Copy, Clone, Default)]
+pub struct FrontierPatch(pub FrontierAccountPatch);
 impl Patch for FrontierPatch {
     type Account = FrontierAccountPatch;
 
+    fn account_patch(&self) -> &Self::Account { &self.0 }
     fn code_deposit_limit(&self) -> Option<usize> { None }
     fn callstack_limit(&self) -> usize { 1024 }
     fn gas_extcode(&self) -> Gas { Gas::from(20usize) }
@@ -96,10 +100,12 @@ impl Patch for FrontierPatch {
 }
 
 /// Homestead patch.
-pub struct HomesteadPatch;
+#[derive(Debug, Copy, Clone, Default)]
+pub struct HomesteadPatch(pub FrontierAccountPatch);
 impl Patch for HomesteadPatch {
     type Account = FrontierAccountPatch;
 
+    fn account_patch(&self) -> &Self::Account { &self.0 }
     fn code_deposit_limit(&self) -> Option<usize> { None }
     fn callstack_limit(&self) -> usize { 1024 }
     fn gas_extcode(&self) -> Gas { Gas::from(20usize) }
@@ -126,10 +132,12 @@ impl Patch for HomesteadPatch {
 }
 
 /// Spurious Dragon patch.
-pub struct SpuriousDragonPatch;
+#[derive(Debug, Copy, Clone, Default)]
+pub struct SpuriousDragonPatch(pub StateClearingAccountPatch);
 impl Patch for SpuriousDragonPatch {
     type Account = StateClearingAccountPatch;
 
+    fn account_patch(&self) -> &Self::Account { &self.0 }
     fn code_deposit_limit(&self) -> Option<usize> { Some(0x6000) }
     fn callstack_limit(&self) -> usize { 1024 }
     fn gas_extcode(&self) -> Gas { Gas::from(700usize) }
@@ -156,10 +164,12 @@ impl Patch for SpuriousDragonPatch {
 }
 
 /// Spurious Dragon patch.
-pub struct ByzantiumPatch;
+#[derive(Debug, Copy, Clone, Default)]
+pub struct ByzantiumPatch(pub StateClearingAccountPatch);
 impl Patch for ByzantiumPatch {
     type Account = StateClearingAccountPatch;
 
+    fn account_patch(&self) -> &Self::Account { &self.0 }
     fn code_deposit_limit(&self) -> Option<usize> { Some(0x6000) }
     fn callstack_limit(&self) -> usize { 1024 }
     fn gas_extcode(&self) -> Gas { Gas::from(700usize) }

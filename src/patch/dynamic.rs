@@ -1,16 +1,46 @@
-#[cfg(feature = "std")] use std::cell::Cell;
-#[cfg(not(feature = "std"))] use core::cell::Cell;
-#[cfg(feature = "std")] use std::marker::PhantomData;
-#[cfg(not(feature = "std"))] use core::marker::PhantomData;
-use bigint::{Address, Gas, U256};
+use bigint::{Address, U256, Gas};
 use patch::{AccountPatch, Patch, Precompiled};
 
+/// Fully dynamic Patch where both Patch and AccountPatch values may be configured in runtime
+pub type FullDynamicPatch = DynamicPatch<DynamicAccountPatch>;
+
 #[derive(Clone)]
-pub struct BlockRangePatch<A> {
-    /// Lower block number range bound
-    pub block_num_lower: Option<U256>,
-    /// Upper block number range bound
-    pub block_num_upper: Option<U256>,
+/// AccountPatch that can be configured in client code runtime
+pub struct DynamicAccountPatch {
+    /// Initial nonce for accounts.
+    pub initial_nonce: U256,
+    /// Initial create nonce for accounts. (EIP161.a)
+    pub initial_create_nonce: U256,
+    /// Whether empty accounts are considered to be existing. (EIP161.b/EIP161.c/EIP161.d)
+    pub empty_considered_exists: bool,
+    /// Whether to allow partial change IncreaseBalance.
+    pub allow_partial_change: bool,
+}
+
+impl AccountPatch for DynamicAccountPatch {
+    fn initial_nonce(&self) -> U256 {
+        self.initial_nonce
+    }
+
+    fn initial_create_nonce(&self) -> U256 {
+        self.initial_create_nonce
+    }
+
+    fn empty_considered_exists(&self) -> bool {
+        self.empty_considered_exists
+    }
+
+    /// Whether to allow partial change IncreaseBalance.
+    fn allow_partial_change(&self) -> bool {
+        self.allow_partial_change
+    }
+}
+
+#[derive(Clone)]
+/// Patch that can be configured in client code runtime
+pub struct DynamicPatch<A> {
+    /// AccountPatch
+    pub account_patch: A,
     /// Maximum contract size.
     pub code_deposit_limit: Option<usize>,
     /// Limit of the call stack.
@@ -60,12 +90,12 @@ pub struct BlockRangePatch<A> {
     pub memory_limit: usize,
     /// Precompiled contracts at given address, with required code,
     /// and its definition.
-    pub precompileds: Vec<(Address, Option<&'static [u8]>, &'static dyn Precompiled)>,
-    _marker: PhantomData<A>
+    pub precompileds: &'static [(Address, Option<&'static [u8]>, &'static dyn Precompiled)],
 }
 
-impl<A: AccountPatch> Patch for BlockRangePatch<A> {
+impl<A: AccountPatch> Patch for DynamicPatch<A> {
     type Account = A;
+    fn account_patch(&self) -> &Self::Account { &self.account_patch }
     fn code_deposit_limit(&self) -> Option<usize> { self.code_deposit_limit }
     fn callstack_limit(&self) -> usize { self.callstack_limit }
     fn gas_extcode(&self) -> Gas { self.gas_extcode }
@@ -90,87 +120,4 @@ impl<A: AccountPatch> Patch for BlockRangePatch<A> {
     fn precompileds(&self) -> &[(Address, Option<&'static [u8]>, &'static dyn Precompiled)] {
         &self.precompileds
     }
-}
-
-/// Block-number range configurable Patch
-// TODO: benchmark performance
-pub struct DynamicPatch<A> {
-    patches: Vec<BlockRangePatch<A>>,
-    block_number: Cell<U256>,
-    current_patch_idx: Cell<usize>,
-}
-
-impl<A> DynamicPatch<A> {
-    fn current_patch(&self) -> &BlockRangePatch<A> {
-        // Start with stored idx as an attempt to perform lookups faster
-        let idx = self.current_patch_idx.get();
-
-        // Make a wrapped cycle through patches idx -> idx-1
-        let patches_cnt = self.patches.len();
-        let block_num = self.block_number.get();
-        let mut found = false;
-        for (idx, patch) in self.patches.iter()
-            .enumerate()
-            .skip(idx)
-            .cycle()
-            .take(patches_cnt)
-        {
-            found = patch.block_num_lower.map(|n| n <= block_num).unwrap_or(true) &&
-                patch.block_num_upper.map(|n| block_num < n).unwrap_or(true);
-
-            if found {
-                self.current_patch_idx.set(idx);
-                break;
-            }
-        }
-
-        if !found {
-            panic!("dynamic patch configuration is incorrect: couldn't find appropriate patch for block number {}", block_num);
-        }
-
-        &self.patches[self.current_patch_idx.get()]
-    }
-}
-
-macro_rules! delegate_patch_methods {
-    { $($method:tt -> $ret:ty;)* } => {
-        $(
-            fn $method(&self) -> $ret {
-                self.current_patch().$method()
-            }
-        )*
-    };
-}
-
-impl<A: AccountPatch> Patch for DynamicPatch<A> {
-    type Account = A;
-
-    fn precompileds(&self) -> &[(Address, Option<&[u8]>, &dyn Precompiled)] {
-        self.current_patch().precompileds()
-    }
-
-    delegate_patch_methods! {
-        code_deposit_limit -> Option<usize>;
-        callstack_limit -> usize;
-        gas_extcode -> Gas;
-        gas_balance -> Gas;
-        gas_sload -> Gas;
-        gas_suicide -> Gas;
-        gas_suicide_new_account -> Gas;
-        gas_call -> Gas;
-        gas_expbyte -> Gas;
-        gas_transaction_create -> Gas;
-        force_code_deposit -> bool;
-        has_delegate_call -> bool;
-        has_static_call -> bool;
-        has_revert -> bool;
-        has_return_data -> bool;
-        has_bitwise_shift -> bool;
-        has_extcodehash -> bool;
-        has_reduced_sstore_gas_metering -> bool;
-        err_on_call_with_more_gas -> bool;
-        call_create_l64_after_gas -> bool;
-        memory_limit -> usize;
-    }
-
 }

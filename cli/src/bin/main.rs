@@ -167,7 +167,7 @@ fn handle_fire_with_rpc<T: GethRPCClient>(client: &mut T, vm: &mut VM, block_num
 }
 
 fn main() {
-    let matches = clap_app!(sputnikvm =>
+    let matches = clap_app!(evm =>
         (version: "0.1")
         (author: "Ethereum Classic Contributors")
         (about: "CLI tool for SputnikVM.")
