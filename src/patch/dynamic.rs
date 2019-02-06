@@ -1,9 +1,6 @@
 use bigint::{Address, U256, Gas};
 use patch::{AccountPatch, Patch, Precompiled};
 
-/// Fully dynamic Patch where both Patch and AccountPatch values may be configured in runtime
-pub type FullDynamicPatch = DynamicPatch<DynamicAccountPatch>;
-
 #[derive(Clone)]
 /// AccountPatch that can be configured in client code runtime
 pub struct DynamicAccountPatch {
@@ -38,9 +35,9 @@ impl AccountPatch for DynamicAccountPatch {
 
 #[derive(Clone)]
 /// Patch that can be configured in client code runtime
-pub struct DynamicPatch<A> {
+pub struct DynamicPatch {
     /// AccountPatch
-    pub account_patch: A,
+    pub account_patch: DynamicAccountPatch,
     /// Maximum contract size.
     pub code_deposit_limit: Option<usize>,
     /// Limit of the call stack.
@@ -93,8 +90,8 @@ pub struct DynamicPatch<A> {
     pub precompileds: &'static [(Address, Option<&'static [u8]>, &'static dyn Precompiled)],
 }
 
-impl<A: AccountPatch> Patch for DynamicPatch<A> {
-    type Account = A;
+impl Patch for DynamicPatch {
+    type Account = DynamicAccountPatch;
     fn account_patch(&self) -> &Self::Account { &self.account_patch }
     fn code_deposit_limit(&self) -> Option<usize> { self.code_deposit_limit }
     fn callstack_limit(&self) -> usize { self.callstack_limit }

@@ -273,7 +273,3 @@ impl<A: AccountPatch> Patch for ConstantinoplePatch<A> {
     fn precompileds(&self) -> &'static [(Address, Option<&'static [u8]>, &'static Precompiled)] {
         &BYZANTIUM_PRECOMPILEDS }
 }
-
-pub type MainnetDynamicPatch = DynamicPatch<MainnetAccountPatch>;
-pub type MordenDynamicPatch = DynamicPatch<MordenAccountPatch>;
-
