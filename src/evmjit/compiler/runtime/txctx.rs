@@ -7,43 +7,13 @@ use inkwell::module::Module;
 use inkwell::types::StructType;
 use inkwell::types::PointerType;
 use inkwell::values::PointerValue;
-use inkwell::values::BasicValueEnum;
 use inkwell::values::FunctionValue;
 use inkwell::module::Linkage::*;
 use inkwell::AddressSpace;
 use evmjit::compiler::runtime::env::EnvDataType;
-use evmjit::compiler::evmtypes::EvmTypes;
 use llvm_sys::LLVMCallConv::*;
 use std::ffi::CString;
 
-#[derive(PartialEq)]
-pub enum TransactionContextTypeFields {
-    GasPrice,
-    Origin,
-    CoinBase,
-    Number,
-    TimeStamp,
-    GasLimit,
-    Difficulty
-}
-
-trait TransactionContextTypeFieldToIndex {
-    fn to_index(&self) -> usize;
-}
-
-impl TransactionContextTypeFieldToIndex for TransactionContextTypeFields {
-    fn to_index(&self) -> usize {
-        match self {
-            TransactionContextTypeFields::GasPrice => 0,
-            TransactionContextTypeFields::Origin => 1,
-            TransactionContextTypeFields::CoinBase => 2,
-            TransactionContextTypeFields::Number => 3,
-            TransactionContextTypeFields::TimeStamp => 4,
-            TransactionContextTypeFields::GasLimit => 5,
-            TransactionContextTypeFields::Difficulty => 6,
-        }
-    }
-}
 
 #[derive(Debug, Singleton)]
 
@@ -273,26 +243,17 @@ impl<'a> TransactionContextManager<'a> {
     pub fn get_tx_ctx_type(&self) -> & TransactionContextType {
         TransactionContextType::get_instance(self.m_context)
     }
-    
-    pub fn gen_tx_ctx_item_ir(&self, field : TransactionContextTypeFields) -> BasicValueEnum {
-        let call = self.m_builder.build_call (self.m_load_tx_ctx_fn, &[self.m_tx_ctx_loaded.into(),
-                                                             self.m_tx_ctx.into()], "");
-        call.set_call_convention(LLVMFastCallConv as u32);
-        let index = field.to_index();
 
-        unsafe {
-            let mut ptr = self.m_builder.build_struct_gep(self.m_tx_ctx, index as u32, "");
+    pub fn get_tx_ctx_loaded_ssa_var(&self) -> PointerValue {
+        self.m_tx_ctx_loaded
+    }
 
-            // Origin and Coinbase are declared as arrays of 20 bytes (160 bits) to deal with alignment issues
-            // Cast back to i160 pointer here
-            
-            if field ==  TransactionContextTypeFields::Origin || field == TransactionContextTypeFields::CoinBase {
-                let types_instance = EvmTypes::get_instance(self.m_context);
-                ptr = self.m_builder.build_pointer_cast (ptr, types_instance.get_address_ptr_type(), "");
-            }
-            
-            self.m_builder.build_load(ptr, "")
-        }
+    pub fn get_tx_ctx_ssa_var(&self) -> PointerValue {
+        self.m_tx_ctx
+    }
+
+    pub fn get_tx_ctx_fn_ssa_var(&self) -> FunctionValue {
+        self.m_load_tx_ctx_fn
     }
 }
 
@@ -303,17 +264,6 @@ mod tests {
     use super::*;
     use inkwell::values::InstructionOpcode;
     
-    #[test]
-    fn test_data_field_to_index() {
-        assert_eq!(TransactionContextTypeFields::GasPrice.to_index(), 0);
-        assert_eq!(TransactionContextTypeFields::Origin.to_index(), 1);
-        assert_eq!(TransactionContextTypeFields::CoinBase.to_index(), 2);
-        assert_eq!(TransactionContextTypeFields::Number.to_index(), 3);
-        assert_eq!(TransactionContextTypeFields::TimeStamp.to_index(), 4);
-        assert_eq!(TransactionContextTypeFields::GasLimit.to_index(), 5);
-        assert_eq!(TransactionContextTypeFields::Difficulty.to_index(), 6);
-    }
-
     #[test]
     fn test_tx_ctx_type() {
         let context = Context::create();
@@ -436,139 +386,6 @@ mod tests {
 
     }
 
-    #[test]
-    fn test_get_tx_ctx_item_gasprice() {
-        use super::super::MainFuncCreator;
-        let context = Context::create();
-        let module = context.create_module("my_module");
-        let builder = context.create_builder();
-
-        // Need to create main function before TransactionConextManager otherwise we will crash
-        MainFuncCreator::new ("main", &context, &builder, &module);
-        let manager = TransactionContextManager::new(&context, &builder, &module);
-
-        // Create dummy function
-
-        let fn_type = context.void_type().fn_type(&[], false);
-        let my_fn = module.add_function("my_fn", fn_type, Some(External));
-        let entry_bb = context.append_basic_block(&my_fn, "entry");
-
-        builder.position_at_end(&entry_bb);
-
-        // This call will generate some ir code for us to test
-        manager.gen_tx_ctx_item_ir(TransactionContextTypeFields::GasPrice);
-
-        let entry_block_optional = my_fn.get_first_basic_block();
-        assert!(entry_block_optional != None);
-        let entry_block = entry_block_optional.unwrap();
-        assert_eq!(*entry_block.get_name(), *CString::new("entry").unwrap());
-
-        assert!(entry_block.get_first_instruction() != None);
-        let first_insn = entry_block.get_first_instruction().unwrap();
-        assert_eq!(first_insn.get_opcode(), InstructionOpcode::Call);
-
-        assert!(first_insn.get_next_instruction() != None);
-        let second_insn = first_insn.get_next_instruction().unwrap();
-        assert_eq!(second_insn.get_opcode(), InstructionOpcode::GetElementPtr);
-
-        assert!(second_insn.get_next_instruction() != None);
-        let third_insn = second_insn.get_next_instruction().unwrap();
-        assert_eq!(third_insn.get_opcode(), InstructionOpcode::Load);
-
-        assert!(third_insn.get_next_instruction() == None);
-    }
-
-    #[test]
-    fn test_get_tx_ctx_item_origin() {
-        use super::super::MainFuncCreator;
-        let context = Context::create();
-        let module = context.create_module("my_module");
-        let builder = context.create_builder();
-
-        // Need to create main function before TransactionConextManager otherwise we will crash
-        MainFuncCreator::new ("main", &context, &builder, &module);
-        let manager = TransactionContextManager::new(&context, &builder, &module);
-
-        // Create dummy function
-
-        let fn_type = context.void_type().fn_type(&[], false);
-        let my_fn = module.add_function("my_fn", fn_type, Some(External));
-        let entry_bb = context.append_basic_block(&my_fn, "entry");
-
-        builder.position_at_end(&entry_bb);
-
-        // This call will generate some ir code for us to test
-        manager.gen_tx_ctx_item_ir(TransactionContextTypeFields::Origin);
-
-        let entry_block_optional = my_fn.get_first_basic_block();
-        assert!(entry_block_optional != None);
-        let entry_block = entry_block_optional.unwrap();
-        assert_eq!(*entry_block.get_name(), *CString::new("entry").unwrap());
-
-        assert!(entry_block.get_first_instruction() != None);
-        let first_insn = entry_block.get_first_instruction().unwrap();
-        assert_eq!(first_insn.get_opcode(), InstructionOpcode::Call);
-
-        assert!(first_insn.get_next_instruction() != None);
-        let second_insn = first_insn.get_next_instruction().unwrap();
-        assert_eq!(second_insn.get_opcode(), InstructionOpcode::GetElementPtr);
-
-        assert!(second_insn.get_next_instruction() != None);
-        let third_insn = second_insn.get_next_instruction().unwrap();
-        assert_eq!(third_insn.get_opcode(), InstructionOpcode::BitCast);
-
-        assert!(third_insn.get_next_instruction() != None);
-        let fourth_insn = third_insn.get_next_instruction().unwrap();
-        assert_eq!(fourth_insn.get_opcode(), InstructionOpcode::Load);
-
-        assert!(fourth_insn.get_next_instruction() == None);
-    }
-
-    #[test]
-    fn test_get_tx_ctx_item_coinbase() {
-        use super::super::MainFuncCreator;
-        let context = Context::create();
-        let module = context.create_module("my_module");
-        let builder = context.create_builder();
-
-        // Need to create main function before TransactionConextManager otherwise we will crash
-        MainFuncCreator::new ("main", &context, &builder, &module);
-        let manager = TransactionContextManager::new(&context, &builder, &module);
-
-        // Create dummy function
-
-        let fn_type = context.void_type().fn_type(&[], false);
-        let my_fn = module.add_function("my_fn", fn_type, Some(External));
-        let entry_bb = context.append_basic_block(&my_fn, "entry");
-
-        builder.position_at_end(&entry_bb);
-
-        // This call will generate some ir code for us to test
-        manager.gen_tx_ctx_item_ir(TransactionContextTypeFields::CoinBase);
-
-        let entry_block_optional = my_fn.get_first_basic_block();
-        assert!(entry_block_optional != None);
-        let entry_block = entry_block_optional.unwrap();
-        assert_eq!(*entry_block.get_name(), *CString::new("entry").unwrap());
-
-        assert!(entry_block.get_first_instruction() != None);
-        let first_insn = entry_block.get_first_instruction().unwrap();
-        assert_eq!(first_insn.get_opcode(), InstructionOpcode::Call);
-
-        assert!(first_insn.get_next_instruction() != None);
-        let second_insn = first_insn.get_next_instruction().unwrap();
-        assert_eq!(second_insn.get_opcode(), InstructionOpcode::GetElementPtr);
-
-        assert!(second_insn.get_next_instruction() != None);
-        let third_insn = second_insn.get_next_instruction().unwrap();
-        assert_eq!(third_insn.get_opcode(), InstructionOpcode::BitCast);
-
-        assert!(third_insn.get_next_instruction() != None);
-        let fourth_insn = third_insn.get_next_instruction().unwrap();
-        assert_eq!(fourth_insn.get_opcode(), InstructionOpcode::Load);
-
-        assert!(fourth_insn.get_next_instruction() == None);
-    }
 
     #[test]
     fn test_get_tx_ctx_type() {
