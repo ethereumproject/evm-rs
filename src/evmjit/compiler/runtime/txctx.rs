@@ -263,6 +263,7 @@ mod tests {
     //use std::ffi::CString;
     use super::*;
     use inkwell::values::InstructionOpcode;
+    use inkwell::values::BasicValue;
     
     #[test]
     fn test_tx_ctx_type() {
@@ -291,66 +292,6 @@ mod tests {
         assert_eq!(load_tx_ctx_fn.get_call_conventions(), LLVMFastCallConv as u32);
         assert_eq!(load_tx_ctx_fn.count_params(), 3);
         assert_eq!(load_tx_ctx_fn.count_basic_blocks(), 3);
-
-        let check_block_optional = load_tx_ctx_fn.get_first_basic_block();
-        assert!(check_block_optional != None);
-        let check_block = check_block_optional.unwrap();
-        assert_eq!(*check_block.get_name(), *CString::new("Check").unwrap());
-
-        assert!(check_block.get_first_instruction() != None);
-        let first_check_insn = check_block.get_first_instruction().unwrap();
-        assert_eq!(first_check_insn.get_opcode(), InstructionOpcode::Load);
-
-        assert!(first_check_insn.get_next_instruction() != None);
-        let second_check_insn = first_check_insn.get_next_instruction().unwrap();
-        assert_eq!(second_check_insn.get_opcode(), InstructionOpcode::Br);
-        assert!(second_check_insn.get_next_instruction() == None);
-
-        let load_block_optional = check_block.get_next_basic_block();
-        assert!(load_block_optional != None);
-        let load_block = load_block_optional.unwrap();
-        assert_eq!(*load_block.get_name(), *CString::new("Load").unwrap());
-        let first_load_bb_insn = load_block.get_first_instruction().unwrap();
-        assert_eq!(first_load_bb_insn.get_opcode(), InstructionOpcode::Store);
-
-        assert!(first_load_bb_insn.get_next_instruction() != None);
-        let second_load_bb_insn = first_load_bb_insn.get_next_instruction().unwrap();
-        assert_eq!(second_load_bb_insn.get_opcode(), InstructionOpcode::Call);
-
-        assert!(second_load_bb_insn.get_next_instruction() != None);
-        let third_load_bb_insn = second_load_bb_insn.get_next_instruction().unwrap();
-        assert_eq!(third_load_bb_insn.get_opcode(), InstructionOpcode::Br);
-        assert!(third_load_bb_insn.get_next_instruction() == None);
-
-        let exit_block_optional = load_block.get_next_basic_block();
-        assert!(exit_block_optional != None);
-        let exit_block = exit_block_optional.unwrap();
-        assert_eq!(*exit_block.get_name(), *CString::new("Exit").unwrap());
-        let first_exit_bb_insn = exit_block.get_first_instruction().unwrap();
-        assert_eq!(first_exit_bb_insn.get_opcode(), InstructionOpcode::Return);
-
-        assert!(first_exit_bb_insn.get_next_instruction() == None);
-
-    }
-
-    #[test]
-    fn test_transaction_context_manager() {
-        use super::super::MainFuncCreator;
-        let context = Context::create();
-        let module = context.create_module("my_module");
-        let builder = context.create_builder();
-
-        // Need to create main function before TransactionConextManager otherwise we will crash
-        MainFuncCreator::new ("main", &context, &builder, &module);
-        
-        TransactionContextManager::new(&context, &builder, &module);
-        let load_tx_ctx_fn_optional = module.get_function ("loadTxCtx");
-        assert!(load_tx_ctx_fn_optional != None);
-
-        let load_tx_ctx_fn = load_tx_ctx_fn_optional.unwrap();
-        assert!(load_tx_ctx_fn.get_linkage() == Private);
-        assert!(load_tx_ctx_fn.count_basic_blocks() == 3);
-        assert!(load_tx_ctx_fn.count_params() == 3);
 
         let func_parm1_opt = load_tx_ctx_fn.get_nth_param(0);
         assert!(!func_parm1_opt.is_none());
@@ -384,6 +325,162 @@ mod tests {
         let the_struct_type2 = funct_param3_elem_t.as_struct_type();
         assert!(EnvDataType::is_env_data_type (&the_struct_type2));
 
+        let check_block_optional = load_tx_ctx_fn.get_first_basic_block();
+        assert!(check_block_optional != None);
+        let check_block = check_block_optional.unwrap();
+        assert_eq!(*check_block.get_name(), *CString::new("Check").unwrap());
+
+        assert!(check_block.get_first_instruction() != None);
+        let first_check_insn = check_block.get_first_instruction().unwrap();
+        assert_eq!(first_check_insn.get_opcode(), InstructionOpcode::Load);
+        assert_eq!(first_check_insn.get_num_operands(), 1);
+
+        let load_operand0 = first_check_insn.get_operand(0).unwrap();
+        assert!(load_operand0.is_pointer_value());
+
+        let load_operand0_ptr_elt_t = load_operand0.into_pointer_value().get_type().get_element_type();
+
+        assert!(load_operand0_ptr_elt_t.is_int_type());
+        assert_eq!(load_operand0_ptr_elt_t.as_int_type().get_bit_width(), 1);
+
+        assert!(first_check_insn.get_next_instruction() != None);
+        let second_check_insn = first_check_insn.get_next_instruction().unwrap();
+        assert_eq!(second_check_insn.get_opcode(), InstructionOpcode::Br);
+        // Condition branch has two operand, unconditional has 2
+        assert_eq!(second_check_insn.get_num_operands(), 3);
+
+        let br_operand0 = second_check_insn.get_operand(0).unwrap();
+        let insn_setting_br_operand0 = br_operand0.as_instruction_value().unwrap();
+        assert_eq!(insn_setting_br_operand0, first_check_insn);
+
+        // Check for end of basic block
+        assert!(second_check_insn.get_next_instruction() == None);
+
+        let load_block_optional = check_block.get_next_basic_block();
+        assert!(load_block_optional != None);
+        let load_block = load_block_optional.unwrap();
+        assert_eq!(*load_block.get_name(), *CString::new("Load").unwrap());
+        let first_load_bb_insn = load_block.get_first_instruction().unwrap();
+        assert_eq!(first_load_bb_insn.get_opcode(), InstructionOpcode::Store);
+        assert_eq!(first_load_bb_insn.get_num_operands(), 2);
+
+        let store_operand0 = first_load_bb_insn.get_operand(0).unwrap();
+        assert!(store_operand0.is_int_value());
+        let store_operand0_value = store_operand0.into_int_value();
+        assert_eq!(store_operand0_value, context.bool_type().const_int(1, false));
+
+        let store_operand1 = first_load_bb_insn.get_operand(1).unwrap();
+        assert!(store_operand1.is_pointer_value());
+        let store_operand1_ptr_elt_t = store_operand1.into_pointer_value().get_type().get_element_type();
+
+        assert!(store_operand1_ptr_elt_t.is_int_type());
+        assert_eq!(store_operand1_ptr_elt_t.as_int_type().get_bit_width(), 1);
+
+        assert!(first_load_bb_insn.get_next_instruction() != None);
+        let second_load_bb_insn = first_load_bb_insn.get_next_instruction().unwrap();
+        assert_eq!(second_load_bb_insn.get_opcode(), InstructionOpcode::Call);
+        assert_eq!(second_load_bb_insn.get_num_operands(), 3);
+
+        let call_operand0 = second_load_bb_insn.get_operand(0).unwrap();
+        assert!(call_operand0.is_pointer_value());   // should be pointer to transaction context
+
+        let call_operand0_elem_t = call_operand0.as_pointer_value().get_type().get_element_type();
+        assert!(call_operand0_elem_t.is_struct_type());
+
+        let the_struct_type = call_operand0_elem_t.as_struct_type();
+        assert!(TransactionContextType::is_transaction_context_type (&the_struct_type));
+
+        let call_operand1 = second_load_bb_insn.get_operand(1).unwrap();
+        assert!(call_operand1.is_pointer_value());   // should be pointer to environment
+
+        let call_operand1_elem_t = call_operand1.as_pointer_value().get_type().get_element_type();
+        assert!(call_operand1_elem_t.is_struct_type());
+
+        let the_struct_type2 = call_operand1_elem_t.as_struct_type();
+        assert!(EnvDataType::is_env_data_type (&the_struct_type2));
+
+        assert!(second_load_bb_insn.get_next_instruction() != None);
+        let third_load_bb_insn = second_load_bb_insn.get_next_instruction().unwrap();
+        assert_eq!(third_load_bb_insn.get_opcode(), InstructionOpcode::Br);
+        assert_eq!(third_load_bb_insn.get_num_operands(), 1);
+
+        assert!(third_load_bb_insn.get_next_instruction() == None);
+
+        let exit_block_optional = load_block.get_next_basic_block();
+        assert!(exit_block_optional != None);
+        let exit_block = exit_block_optional.unwrap();
+        assert_eq!(*exit_block.get_name(), *CString::new("Exit").unwrap());
+        let first_exit_bb_insn = exit_block.get_first_instruction().unwrap();
+        assert_eq!(first_exit_bb_insn.get_opcode(), InstructionOpcode::Return);
+
+        assert!(first_exit_bb_insn.get_next_instruction() == None);
+
+    }
+
+    #[test]
+    fn test_transaction_context_manager() {
+        use super::super::MainFuncCreator;
+        let context = Context::create();
+        let module = context.create_module("my_module");
+        let builder = context.create_builder();
+
+        // Need to create main function before TransactionConextManager otherwise we will crash
+        MainFuncCreator::new ("main", &context, &builder, &module);
+        
+        TransactionContextManager::new(&context, &builder, &module);
+        let main_fn_optional = module.get_function ("main");
+        assert!(main_fn_optional != None);
+
+        let main_fn = main_fn_optional.unwrap();
+        assert!(main_fn.count_params() == 1);
+
+        assert!(main_fn.get_first_basic_block() != None);
+        let entry_block = main_fn.get_first_basic_block().unwrap();
+        assert_eq!(*entry_block.get_name(), *CString::new("Entry").unwrap());
+
+        assert!(entry_block.get_first_instruction() != None);
+        let entry_bb_first_insn = entry_block.get_first_instruction().unwrap();
+        assert_eq!(entry_bb_first_insn.get_opcode(), InstructionOpcode::Alloca);
+        assert_eq!(entry_bb_first_insn.get_num_operands(), 1);
+
+        let mut alloca_operand0 = entry_bb_first_insn.get_operand(0).unwrap();
+        assert!(alloca_operand0.is_int_value());
+
+        let alloca_arg_t = context.i32_type();
+
+        // Operand 0 of alloca is a '1', meaning reserve space for 1 byte
+        assert_eq!(alloca_operand0.into_int_value(), alloca_arg_t.const_int(1, false));
+
+        assert!(entry_bb_first_insn.get_next_instruction() != None);
+        let entry_bb_second_insn = entry_bb_first_insn.get_next_instruction().unwrap();
+        assert_eq!(entry_bb_second_insn.get_num_operands(), 2);
+
+        assert_eq!(entry_bb_second_insn.get_opcode(), InstructionOpcode::Store);
+
+        let store_operand0 = entry_bb_second_insn.get_operand(0).unwrap();
+        assert!(store_operand0.is_int_value());
+        let store_operand0_value = store_operand0.into_int_value();
+        assert_eq!(store_operand0_value, context.bool_type().const_int(0, false));
+
+        let store_operand1 = entry_bb_second_insn.get_operand(1).unwrap();
+        assert!(store_operand1.is_pointer_value());
+        let store_operand1_ptr_elt_t = store_operand1.into_pointer_value().get_type().get_element_type();
+
+        assert!(store_operand1_ptr_elt_t.is_int_type());
+        assert_eq!(store_operand1_ptr_elt_t.as_int_type().get_bit_width(), 1);
+
+        assert!(entry_bb_second_insn.get_next_instruction() != None);
+        let entry_bb_third_insn = entry_bb_second_insn.get_next_instruction().unwrap();
+        assert_eq!(entry_bb_third_insn.get_num_operands(), 1);
+        assert_eq!(entry_bb_third_insn.get_opcode(), InstructionOpcode::Alloca);
+
+        alloca_operand0 = entry_bb_third_insn.get_operand(0).unwrap();
+        assert!(alloca_operand0.is_int_value());
+
+        let alloca_arg_t = context.i32_type();
+
+        // TODO: Figure our why this is failing
+        assert_eq!(alloca_operand0.into_int_value(), alloca_arg_t.const_int(128, false));
     }
 
 
