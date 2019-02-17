@@ -338,6 +338,7 @@ mod tests {
     use std::ffi::CString;
     use super::*;
     use inkwell::values::InstructionOpcode;
+    use inkwell::values::BasicValue;
 
     #[test]
     fn test_data_field_to_index() {
@@ -453,26 +454,57 @@ mod tests {
 
         // Create dummy function
 
-        let fn_type = context.void_type().fn_type(&[], false);
-        let my_fn = module.add_function("my_fn", fn_type, Some(External));
-        let entry_bb = context.append_basic_block(&my_fn, "entry");
+        let main_fn_optional = module.get_function ("main");
+        assert!(main_fn_optional != None);
 
-        builder.position_at_end(&entry_bb);
+        let main_fn = main_fn_optional.unwrap();
+        let gas_bb = context.append_basic_block(&main_fn, "gas");
+
+        builder.position_at_end(&gas_bb);
 
         // This call will generate some ir code for us to test
         manager.gen_tx_ctx_item_ir(TransactionContextTypeFields::GasPrice);
 
         module.print_to_stderr();
 
-        let entry_block_optional = my_fn.get_first_basic_block();
-        assert!(entry_block_optional != None);
-        let entry_block = entry_block_optional.unwrap();
-        assert_eq!(*entry_block.get_name(), *CString::new("entry").unwrap());
 
-        assert!(entry_block.get_first_instruction() != None);
-        let first_insn = entry_block.get_first_instruction().unwrap();
+        assert!(gas_bb.get_first_instruction() != None);
+        let first_insn = gas_bb.get_first_instruction().unwrap();
         assert_eq!(first_insn.get_opcode(), InstructionOpcode::Call);
         assert_eq!(first_insn.get_num_operands(), 4);
+
+        let call_operand0 = first_insn.get_operand(0).unwrap();
+        let call_operand0_instruction = call_operand0.as_instruction_value().unwrap();
+
+        assert!(call_operand0.is_pointer_value());   // should be i1 *
+
+        // Instruction that generated ssa var of operand 0 of call is alloca
+        assert_eq!(call_operand0_instruction.get_opcode(), InstructionOpcode::Alloca);
+        let alloca_operand0 = call_operand0_instruction.get_operand(0).unwrap();
+        assert!(alloca_operand0.is_int_value());
+
+        let alloca_arg_t = context.i32_type();
+
+        // Operand 0 of alloca is a '1', meaning reserve space for 1 byte
+        assert_eq!(alloca_operand0.into_int_value(), alloca_arg_t.const_int(1, false));
+
+
+
+
+        let call_operand1 = first_insn.get_operand(1).unwrap();
+        let call_operand1_instruction = call_operand1.as_instruction_value().unwrap();
+
+        assert_ne!(call_operand0, call_operand1);
+        assert!(call_operand1.is_pointer_value());   // should be evm.txctx *
+
+        // Instruction that generated ssa var of operand 0 of call is alloca
+        assert_eq!(call_operand1_instruction.get_opcode(), InstructionOpcode::Alloca);
+        let alloca_operand1 = call_operand1_instruction.get_operand(0).unwrap();
+        assert!(alloca_operand1.is_int_value());
+
+        // Operand 0 of alloca is a '1', meaning reserve space for one
+
+        assert_eq!(alloca_operand1.into_int_value(), alloca_arg_t.const_int(1, false));
 
         assert!(first_insn.get_next_instruction() != None);
         let second_insn = first_insn.get_next_instruction().unwrap();
