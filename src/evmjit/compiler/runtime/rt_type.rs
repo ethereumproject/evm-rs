@@ -321,7 +321,7 @@ mod tests {
         let module = context.create_module("my_module");
         let builder = context.create_builder();
 
-        // Need to create main function before TransactionConextManager otherwise we will crash
+        // Need to create main function before RuntimeTypeManager otherwise we will crash
         let main_func = MainFuncCreator::new ("main", &context, &builder, &module);
         RuntimeTypeManager::new (&context, &builder);
 
@@ -330,68 +330,191 @@ mod tests {
         assert!(entry_block.get_first_instruction() != None);
         let first_insn = entry_block.get_first_instruction().unwrap();
         assert_eq!(first_insn.get_opcode(), InstructionOpcode::GetElementPtr);
+        assert_eq!(first_insn.get_num_operands(), 3);
+
+        let mut gep_operand0 = first_insn.get_operand(0).unwrap();
+        assert!(gep_operand0.is_pointer_value());
+        let mut gep_operand0_ptr_elt_t = gep_operand0.into_pointer_value().get_type().get_element_type();
+        assert!(gep_operand0_ptr_elt_t.is_struct_type());
+        let mut gep_operand0_type = gep_operand0_ptr_elt_t.into_struct_type();
+        assert!(RuntimeType::is_runtime_type (&gep_operand0_type));
+
+        let mut gep_operand1 = first_insn.get_operand(1).unwrap();
+        assert!(gep_operand1.is_int_value());
+        assert_eq!(gep_operand1.into_int_value(), context.i32_type().const_int(0, false));
+
+        let mut gep_operand2 = first_insn.get_operand(2).unwrap();
+        assert!(gep_operand2.is_int_value());
+        assert_eq!(gep_operand2.into_int_value(), context.i32_type().const_int(0, false));
 
         assert!(first_insn.get_next_instruction() != None);
         let second_insn = first_insn.get_next_instruction().unwrap();
         assert_eq!(second_insn.get_opcode(), InstructionOpcode::Load);
+        assert_eq!(second_insn.get_num_operands(), 1);
+        let mut load_operand0 = second_insn.get_operand(0).unwrap();
+        assert!(load_operand0.is_pointer_value());
+        let mut load_operand0_ptr_elt_t = load_operand0.into_pointer_value().get_type().get_element_type();
+        assert!(load_operand0_ptr_elt_t.is_pointer_type());
 
+        let load_operand0_ptr_to_ptr = load_operand0_ptr_elt_t.as_pointer_type().get_element_type();
+        assert!(load_operand0_ptr_to_ptr.is_struct_type());
+        assert!(RuntimeDataType::is_rt_data_type (load_operand0_ptr_to_ptr.as_struct_type()));;
         assert!(second_insn.get_next_instruction() != None);
+
         let third_insn = second_insn.get_next_instruction().unwrap();
         assert_eq!(third_insn.get_opcode(), InstructionOpcode::GetElementPtr);
+
+        gep_operand0 = third_insn.get_operand(0).unwrap();
+        assert!(gep_operand0.is_pointer_value());
+        gep_operand0_ptr_elt_t = gep_operand0.into_pointer_value().get_type().get_element_type();
+        assert!(gep_operand0_ptr_elt_t.is_struct_type());
+        gep_operand0_type = gep_operand0_ptr_elt_t.into_struct_type();
+        assert!(RuntimeType::is_runtime_type (&gep_operand0_type));
+
+        gep_operand1 = third_insn.get_operand(1).unwrap();
+        assert!(gep_operand1.is_int_value());
+        assert_eq!(gep_operand1.into_int_value(), context.i32_type().const_int(0, false));
+
+        gep_operand2 = third_insn.get_operand(2).unwrap();
+        assert!(gep_operand2.is_int_value());
+        assert_eq!(gep_operand2.into_int_value(), context.i32_type().const_int(2, false));
 
         assert!(third_insn.get_next_instruction() != None);
         let fourth_insn = third_insn.get_next_instruction().unwrap();
         assert_eq!(fourth_insn.get_opcode(), InstructionOpcode::GetElementPtr);
 
+        gep_operand0 = fourth_insn.get_operand(0).unwrap();
+        assert!(gep_operand0.is_pointer_value());
+        gep_operand0_ptr_elt_t = gep_operand0.into_pointer_value().get_type().get_element_type();
+        assert!(gep_operand0_ptr_elt_t.is_struct_type());
+        gep_operand0_type = gep_operand0_ptr_elt_t.into_struct_type();
+        assert!(RuntimeType::is_runtime_type (&gep_operand0_type));
+
+        gep_operand1 = fourth_insn.get_operand(1).unwrap();
+        assert!(gep_operand1.is_int_value());
+        assert_eq!(gep_operand1.into_int_value(), context.i32_type().const_int(0, false));
+
+        gep_operand2 = fourth_insn.get_operand(2).unwrap();
+        assert!(gep_operand2.is_int_value());
+        assert_eq!(gep_operand2.into_int_value(), context.i32_type().const_int(1, false));
+
         assert!(fourth_insn.get_next_instruction() != None);
         let fifth_insn = fourth_insn.get_next_instruction().unwrap();
         assert_eq!(fifth_insn.get_opcode(), InstructionOpcode::Load);
+
+        assert_eq!(fifth_insn.get_num_operands(), 1);
+        load_operand0 = fifth_insn.get_operand(0).unwrap();
+        assert!(load_operand0.is_pointer_value());
+        load_operand0_ptr_elt_t = load_operand0.into_pointer_value().get_type().get_element_type();
+        assert!(load_operand0_ptr_elt_t.is_pointer_type());
+
+        let load_operand0_ptr_to_ptr = load_operand0_ptr_elt_t.as_pointer_type().get_element_type();
+        assert!(load_operand0_ptr_to_ptr.is_struct_type());
+        assert!(EnvDataType::is_env_data_type (load_operand0_ptr_to_ptr.as_struct_type()));;
 
         assert!(fifth_insn.get_next_instruction() != None);
         let sixth_insn = fifth_insn.get_next_instruction().unwrap();
         assert_eq!(sixth_insn.get_opcode(), InstructionOpcode::Load);
 
+        assert_eq!(sixth_insn.get_num_operands(), 1);
+        load_operand0 = sixth_insn.get_operand(0).unwrap();
+        assert!(load_operand0.is_pointer_value());
+        load_operand0_ptr_elt_t = load_operand0.into_pointer_value().get_type().get_element_type();
+        assert!(load_operand0_ptr_elt_t.is_struct_type());
+
+        assert!(RuntimeDataType::is_rt_data_type (load_operand0_ptr_elt_t.as_struct_type()));
+
         assert!(sixth_insn.get_next_instruction() != None);
         let seventh_insn = sixth_insn.get_next_instruction().unwrap();
         assert_eq!(seventh_insn.get_opcode(), InstructionOpcode::ExtractValue);
 
-        assert!(seventh_insn.get_next_instruction() != None);
+
+        assert!(seventh_insn.get_operand(0) != None);
+        let mut extract_val_operand0 = seventh_insn.get_operand(0).unwrap();
+        assert!(extract_val_operand0.is_struct_value());
+        let extract_val_type = extract_val_operand0.into_struct_value().get_type();
+        assert!(RuntimeDataType::is_rt_data_type (&extract_val_type));
+
         let eighth_insn = seventh_insn.get_next_instruction().unwrap();
         assert_eq!(eighth_insn.get_opcode(), InstructionOpcode::ExtractValue);
+
+        extract_val_operand0 = eighth_insn.get_operand(0).unwrap();
+        assert!(extract_val_operand0.is_struct_value());
+        let extract_val_type = extract_val_operand0.into_struct_value().get_type();
+        assert!(RuntimeDataType::is_rt_data_type (&extract_val_type));
 
         assert!(eighth_insn.get_next_instruction() != None);
         let ninth_insn = eighth_insn.get_next_instruction().unwrap();
         assert_eq!(ninth_insn.get_opcode(), InstructionOpcode::ExtractValue);
 
+        extract_val_operand0 = ninth_insn.get_operand(0).unwrap();
+        assert!(extract_val_operand0.is_struct_value());
+        let extract_val_type = extract_val_operand0.into_struct_value().get_type();
+        assert!(RuntimeDataType::is_rt_data_type (&extract_val_type));
+
         assert!(ninth_insn.get_next_instruction() != None);
         let tenth_insn = ninth_insn.get_next_instruction().unwrap();
         assert_eq!(tenth_insn.get_opcode(), InstructionOpcode::ExtractValue);
+
+        extract_val_operand0 = tenth_insn.get_operand(0).unwrap();
+        assert!(extract_val_operand0.is_struct_value());
+        let extract_val_type = extract_val_operand0.into_struct_value().get_type();
+        assert!(RuntimeDataType::is_rt_data_type (&extract_val_type));
 
         assert!(tenth_insn.get_next_instruction() != None);
         let eleventh_insn = tenth_insn.get_next_instruction().unwrap();
         assert_eq!(eleventh_insn.get_opcode(), InstructionOpcode::ExtractValue);
 
+        extract_val_operand0 = eleventh_insn.get_operand(0).unwrap();
+        assert!(extract_val_operand0.is_struct_value());
+        let extract_val_type = extract_val_operand0.into_struct_value().get_type();
+        assert!(RuntimeDataType::is_rt_data_type (&extract_val_type));
+
         assert!(eleventh_insn.get_next_instruction() != None);
         let twelfth_insn = eleventh_insn.get_next_instruction().unwrap();
         assert_eq!(twelfth_insn.get_opcode(), InstructionOpcode::ExtractValue);
+
+        extract_val_operand0 = twelfth_insn.get_operand(0).unwrap();
+        assert!(extract_val_operand0.is_struct_value());
+        let extract_val_type = extract_val_operand0.into_struct_value().get_type();
+        assert!(RuntimeDataType::is_rt_data_type (&extract_val_type));
 
         assert!(twelfth_insn.get_next_instruction() != None);
         let thirteenth_insn = twelfth_insn.get_next_instruction().unwrap();
         assert_eq!(thirteenth_insn.get_opcode(), InstructionOpcode::ExtractValue);
 
+        extract_val_operand0 = thirteenth_insn.get_operand(0).unwrap();
+        assert!(extract_val_operand0.is_struct_value());
+        let extract_val_type = extract_val_operand0.into_struct_value().get_type();
+        assert!(RuntimeDataType::is_rt_data_type (&extract_val_type));
+
         assert!(thirteenth_insn.get_next_instruction() != None);
         let fourteenth_insn = thirteenth_insn.get_next_instruction().unwrap();
         assert_eq!(fourteenth_insn.get_opcode(), InstructionOpcode::ExtractValue);
+
+        extract_val_operand0 = fourteenth_insn.get_operand(0).unwrap();
+        assert!(extract_val_operand0.is_struct_value());
+        let extract_val_type = extract_val_operand0.into_struct_value().get_type();
+        assert!(RuntimeDataType::is_rt_data_type (&extract_val_type));
 
         assert!(fourteenth_insn.get_next_instruction() != None);
         let fifteenth_insn = fourteenth_insn.get_next_instruction().unwrap();
         assert_eq!(fifteenth_insn.get_opcode(), InstructionOpcode::ExtractValue);
 
+        extract_val_operand0 = fifteenth_insn.get_operand(0).unwrap();
+        assert!(extract_val_operand0.is_struct_value());
+        let extract_val_type = extract_val_operand0.into_struct_value().get_type();
+        assert!(RuntimeDataType::is_rt_data_type (&extract_val_type));
+
         assert!(fifteenth_insn.get_next_instruction() != None);
         let sixteenth_insn = fifteenth_insn.get_next_instruction().unwrap();
         assert_eq!(sixteenth_insn.get_opcode(), InstructionOpcode::ExtractValue);
 
-        assert!(sixteenth_insn.get_next_instruction() == None);
+        extract_val_operand0 = sixteenth_insn.get_operand(0).unwrap();
+        assert!(extract_val_operand0.is_struct_value());
+        let extract_val_type = extract_val_operand0.into_struct_value().get_type();
+        assert!(RuntimeDataType::is_rt_data_type (&extract_val_type));
 
+        assert!(sixteenth_insn.get_next_instruction() == None);
     }
 }
