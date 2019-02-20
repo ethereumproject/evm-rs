@@ -1,5 +1,6 @@
 use bigint::{Address, U256, Gas};
 use patch::{AccountPatch, Patch, Precompiled};
+use smallvec::SmallVec;
 
 #[derive(Clone)]
 /// AccountPatch that can be configured in client code runtime
@@ -85,6 +86,8 @@ pub struct DynamicPatch {
     /// Maximum size of the memory, in bytes.
     /// NOTE: **NOT** runtime-configurable by block number
     pub memory_limit: usize,
+    /// Check if precompiled contract is enabled
+    pub enabled_precompileds: SmallVec<[Address; 8]>,
     /// Precompiled contracts at given address, with required code,
     /// and its definition.
     pub precompileds: &'static [(Address, Option<&'static [u8]>, &'static dyn Precompiled)],
@@ -114,6 +117,11 @@ impl Patch for DynamicPatch {
     fn err_on_call_with_more_gas(&self) -> bool { self.err_on_call_with_more_gas }
     fn call_create_l64_after_gas(&self) -> bool { self.call_create_l64_after_gas }
     fn memory_limit(&self) -> usize { self.memory_limit }
+    fn is_precompiled_contract_enabled(&self, address: &Address) -> bool {
+        self.enabled_precompileds.iter()
+            .find(|&a| a == address)
+            .is_some()
+    }
     fn precompileds(&self) -> &[(Address, Option<&'static [u8]>, &'static dyn Precompiled)] {
         &self.precompileds
     }

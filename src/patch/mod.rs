@@ -87,6 +87,8 @@ pub trait Patch: Clone {
     /// Maximum size of the memory, in bytes.
     /// NOTE: **NOT** runtime-configurable by block number
     fn memory_limit(&self) -> usize;
+    /// Check if the precompiled contract enabled
+    fn is_precompiled_contract_enabled(&self, address: &Address) -> bool;
     /// Precompiled contracts at given address, with required code,
     /// and its definition.
     fn precompileds(&self) -> &[(Address, Option<&[u8]>, &dyn Precompiled)];
@@ -137,6 +139,12 @@ impl Patch for VMTestPatch {
     fn err_on_call_with_more_gas(&self) -> bool { true }
     fn call_create_l64_after_gas(&self) -> bool { false }
     fn memory_limit(&self) -> usize { usize::max_value() }
+    fn is_precompiled_contract_enabled(&self, address: &Address) -> bool {
+        match address.low_u64() {
+            0x1 | 0x2 | 0x3 | 0x4 => true,
+            _ => false
+        }
+    }
     fn precompileds(&self) -> &'static [(Address, Option<&'static [u8]>, &'static dyn Precompiled)] {
         &EMBEDDED_PRECOMPILEDS
     }
@@ -171,6 +179,12 @@ impl Patch for EmbeddedPatch {
     fn err_on_call_with_more_gas(&self) -> bool { false }
     fn call_create_l64_after_gas(&self) -> bool { true }
     fn memory_limit(&self) -> usize { usize::max_value() }
+    fn is_precompiled_contract_enabled(&self, address: &Address) -> bool {
+        match address.low_u64() {
+            0x1 | 0x2 | 0x3 | 0x4 => true,
+            _ => false
+        }
+    }
     fn precompileds(&self) -> &'static [(Address, Option<&'static [u8]>, &'static dyn Precompiled)] {
         &EMBEDDED_PRECOMPILEDS
     }

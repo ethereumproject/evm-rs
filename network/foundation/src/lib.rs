@@ -95,6 +95,12 @@ impl Patch for FrontierPatch {
     fn err_on_call_with_more_gas(&self) -> bool { true }
     fn call_create_l64_after_gas(&self) -> bool { false }
     fn memory_limit(&self) -> usize { usize::max_value() }
+    fn is_precompiled_contract_enabled(&self, address: &Address) -> bool {
+        match address.low_u64() {
+            0x1 | 0x2 | 0x3 | 0x4 => true,
+            _ => false
+        }
+    }
     fn precompileds(&self) -> &'static [(Address, Option<&'static [u8]>, &'static Precompiled)] {
         &FRONTIER_PRECOMPILEDS }
 }
@@ -127,6 +133,12 @@ impl Patch for HomesteadPatch {
     fn err_on_call_with_more_gas(&self) -> bool { true }
     fn call_create_l64_after_gas(&self) -> bool { false }
     fn memory_limit(&self) -> usize { usize::max_value() }
+    fn is_precompiled_contract_enabled(&self, address: &Address) -> bool {
+        match address.low_u64() {
+            0x1 | 0x2 | 0x3 | 0x4 => true,
+            _ => false
+        }
+    }
     fn precompileds(&self) -> &'static [(Address, Option<&'static [u8]>, &'static Precompiled)] {
         &FRONTIER_PRECOMPILEDS }
 }
@@ -159,6 +171,12 @@ impl Patch for EIP150Patch {
     fn err_on_call_with_more_gas(&self) -> bool { false }
     fn call_create_l64_after_gas(&self) -> bool { true }
     fn memory_limit(&self) -> usize { usize::max_value() }
+    fn is_precompiled_contract_enabled(&self, address: &Address) -> bool {
+        match address.low_u64() {
+            0x1 | 0x2 | 0x3 | 0x4 => true,
+            _ => false
+        }
+    }
     fn precompileds(&self) -> &'static [(Address, Option<&'static [u8]>, &'static Precompiled)] {
         &FRONTIER_PRECOMPILEDS }
 }
@@ -191,6 +209,12 @@ impl Patch for SpuriousDragonPatch {
     fn err_on_call_with_more_gas(&self) -> bool { false }
     fn call_create_l64_after_gas(&self) -> bool { true }
     fn memory_limit(&self) -> usize { usize::max_value() }
+    fn is_precompiled_contract_enabled(&self, address: &Address) -> bool {
+        match address.low_u64() {
+            0x1 | 0x2 | 0x3 | 0x4 => true,
+            _ => false
+        }
+    }
     fn precompileds(&self) -> &'static [(Address, Option<&'static [u8]>, &'static Precompiled)] {
         &FRONTIER_PRECOMPILEDS }
 }
@@ -223,6 +247,12 @@ impl Patch for ByzantiumPatch {
     fn err_on_call_with_more_gas(&self) -> bool { false }
     fn call_create_l64_after_gas(&self) -> bool { true }
     fn memory_limit(&self) -> usize { usize::max_value() }
+    fn is_precompiled_contract_enabled(&self, address: &Address) -> bool {
+        match address.low_u64() {
+            0x1 | 0x2 | 0x3 | 0x4 | 0x5 | 0x6 | 0x7 | 0x8 => true,
+            _ => false
+        }
+    }
     fn precompileds(&self) -> &'static [(Address, Option<&'static [u8]>, &'static Precompiled)] {
         &BYZANTIUM_PRECOMPILEDS }
 }

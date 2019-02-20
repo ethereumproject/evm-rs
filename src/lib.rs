@@ -120,6 +120,7 @@ extern crate sha3;
 extern crate ripemd160;
 extern crate sha2;
 extern crate digest;
+extern crate smallvec;
 
 #[macro_use]
 extern crate log;
