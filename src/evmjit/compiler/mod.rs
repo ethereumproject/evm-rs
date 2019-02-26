@@ -12,6 +12,8 @@ pub mod memory;
 pub mod runtime;
 pub mod stack;
 pub mod runtime_functions;
+pub mod callback;
+mod util;
 
 pub use self::jit_context::JITContext;
 pub use self::external_declarations::{DeclarationManager, ExternalFunctionManager};
