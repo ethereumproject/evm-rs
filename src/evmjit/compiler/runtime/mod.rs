@@ -20,11 +20,15 @@ use singletonum::Singleton;
 use self::rt_data_type::RuntimeDataType;
 use self::rt_type::RuntimeType;
 use self::rt_type::RuntimeTypeManager;
+use self::rt_data_type::RuntimeDataTypeFields::Gas;
+use self::rt_data_type::RuntimeDataFieldToIndex;
 use self::txctx::TransactionContextManager;
 use self::stack_init::StackAllocator;
 use evmjit::compiler::evmtypes::EvmTypes;
 use evmjit::compiler::evmconstants::EvmConstants;
 use llvm_sys::LLVMCallConv::*;
+use evmjit::ModuleLookup;
+use evmjit::LLVMAttributeFactory;
 
 #[derive(PartialEq)]
 pub enum TransactionContextTypeFields {
@@ -111,26 +115,33 @@ impl MainFuncCreator {
     }
 }
 
-struct GasPtrManager {
-    m_gas_ptr: PointerValue
+struct GasPtrManager<'a> {
+    m_gas_ptr: PointerValue,
+    m_builder: &'a Builder,
 }
 
-impl GasPtrManager {
-    pub fn new(context: &Context, builder: &Builder, gas_value: BasicValueEnum) -> GasPtrManager {
+impl<'a> GasPtrManager<'a> {
+    pub fn new(context: &Context, builder: &'a Builder, gas_value: BasicValueEnum) -> GasPtrManager<'a> {
         let types_instance = EvmTypes::get_instance(context);
         let gas_p = builder.build_alloca(types_instance.get_gas_type(), "gas.ptr");
         builder.build_store(gas_p, gas_value);
 
         GasPtrManager {
-            m_gas_ptr: gas_p
+            m_gas_ptr: gas_p,
+            m_builder: builder
         }
     }
 
     pub fn get_gas_ptr(&self) -> &PointerValue {
         &self.m_gas_ptr
     }
+
+    pub fn get_gas(&self) -> BasicValueEnum {
+        self.m_builder.build_load(*self.get_gas_ptr(), "gas")
+    }
 }
 
+#[derive(Debug, Copy, Clone)]
 struct ReturnBufferManager<'a> {
     m_return_buf_data_ptr: PointerValue,
     m_return_buf_size_ptr: PointerValue,
@@ -160,9 +171,59 @@ impl<'a> ReturnBufferManager<'a> {
         &self.m_return_buf_size_ptr
     }
 
-    pub fn reset_return_buf(self) {
+    pub fn reset_return_buf(&self) {
         let const_factory = EvmConstants::get_instance(self.m_context);
         self.m_builder.build_store(self.m_return_buf_size_ptr, const_factory.get_i64_zero());
+    }
+}
+
+struct MainPrologue {
+    m_exit_bb: BasicBlock,
+}
+
+impl MainPrologue {
+    pub fn new(context: &Context, module: &Module,
+               rt_type_mgr: &RuntimeTypeManager, gas_mgr: &GasPtrManager,
+               main_func: FunctionValue, stack_base: BasicValueEnum) -> MainPrologue {
+        let exit_bb = context.append_basic_block(&main_func, "Exit");
+        let temp_builder = context.create_builder();
+        temp_builder.position_at_end(&exit_bb);
+
+        let types_instance = EvmTypes::get_instance(context);
+        let phi = temp_builder.build_phi(types_instance.get_contract_return_type(), "ret");
+        let free_func_opt = module.get_function("free");
+
+        let free_func: FunctionValue;
+
+        if free_func_opt == None {
+            let free_ret_type = context.void_type();
+            let arg1 = types_instance.get_word_ptr_type();
+            let free_func_type = free_ret_type.fn_type(&[arg1.into()], false);
+            free_func = module.add_function("free", free_func_type, Some(External));
+
+            let attr_factory = LLVMAttributeFactory::get_instance(&context);
+            free_func.add_attribute(0, *attr_factory.attr_nounwind());
+            free_func.add_attribute(0, *attr_factory.attr_nocapture());
+        } else {
+            free_func = free_func_opt.unwrap();
+        }
+
+        temp_builder.build_call(free_func, &[stack_base.into()], "");
+        let index = Gas.to_index() as u32;
+        unsafe {
+            let ext_gas_ptr = temp_builder.build_struct_gep(rt_type_mgr.get_data_ptr().into_pointer_value(),
+                                                            index, "msg.gas.ptr");
+            temp_builder.build_store(ext_gas_ptr, gas_mgr.get_gas());
+            temp_builder.build_return(Some(&phi.as_basic_value()));
+        }
+
+        MainPrologue {
+            m_exit_bb: exit_bb
+        }
+    }
+
+    pub fn get_exit_bb(&self) -> &BasicBlock {
+        &self.m_exit_bb
     }
 }
 
@@ -171,11 +232,12 @@ pub struct RuntimeManager<'a> {
     m_builder: &'a Builder,
     m_module: &'a Module,
     m_txctx_manager:  TransactionContextManager<'a>,
-    m_rt_type_manager: RuntimeTypeManager,
+    m_rt_type_manager: RuntimeTypeManager<'a>,
 //    m_main_func_creator: MainFuncCreator, 
     m_stack_allocator: StackAllocator,
-    m_gas_ptr_manager: GasPtrManager,
-    m_return_buf_manager: ReturnBufferManager<'a>
+    m_gas_ptr_manager: GasPtrManager<'a>,
+    m_return_buf_manager: ReturnBufferManager<'a>,
+    m_prologue_manager: MainPrologue,
 }
 
 impl<'a> RuntimeManager<'a> {
@@ -184,19 +246,24 @@ impl<'a> RuntimeManager<'a> {
 
         // Generate outline of main function needed by 'RuntimeTypeManager
         //let main_func_creator = MainFuncCreator::new (&main_func_name, &context, &builder, &module);
-        assert!(RuntimeManager::get_main_function_with_builder(builder, module) != None);
+        let main_func_opt = module.get_main_function(builder);
+        assert!(main_func_opt != None);
 
         // Generate IR for transaction context related items
         let txctx_manager = TransactionContextManager::new (&context, &builder, &module);
 
         // Generate IR for runtime type related items
-        let rt_type_manager = RuntimeTypeManager::new (&context, &builder);
+        let rt_type_manager = RuntimeTypeManager::new (&context, &builder, &module);
 
         let stack_allocator = StackAllocator::new (&context, &builder, &module);
 
         let gas_ptr_mgr = GasPtrManager::new(context, builder, rt_type_manager.get_gas());
 
         let return_buf_mgr = ReturnBufferManager::new(context, builder);
+        return_buf_mgr.reset_return_buf();
+
+        let prologue_manager = MainPrologue::new(context, module, &rt_type_manager, &gas_ptr_mgr,
+                                                 main_func_opt.unwrap(), stack_allocator.get_stack_base_as_ir_value());
 
         RuntimeManager {
             m_context: context,
@@ -207,7 +274,8 @@ impl<'a> RuntimeManager<'a> {
   //          m_main_func_creator: main_func_creator,
             m_stack_allocator: stack_allocator,
             m_gas_ptr_manager: gas_ptr_mgr,
-            m_return_buf_manager: return_buf_mgr
+            m_return_buf_manager: return_buf_mgr,
+            m_prologue_manager: prologue_manager,
         }
     }
 
@@ -248,31 +316,20 @@ impl<'a> RuntimeManager<'a> {
     }
 
     pub fn get_runtime_ptr(&self) -> BasicValueEnum {
-        // The parent of the first basic block is a function
+        self.m_rt_type_manager.get_runtime_ptr()
+    }
 
-        let bb = self.m_builder.get_insert_block();
-        assert!(bb != None);
-            
-        let func = bb.unwrap().get_parent();
-        assert!(func != None);
-        let func_val = func.unwrap();
-
-        // The first argument to a function is a pointer to the runtime
-        assert!(func_val.count_params() > 0);
-
-        let runtime_ptr = func_val.get_first_param().unwrap();
-        assert_eq!(runtime_ptr.get_type().into_pointer_type(), self.get_runtime_ptr_type());
-
-        runtime_ptr
+    pub fn get_data_ptr(&self) -> BasicValueEnum {
+        self.m_rt_type_manager.get_data_ptr()
     }
 
     pub fn get_gas_ptr(&self) -> &PointerValue {
-        assert!(self.get_main_function() != None);
+        assert!(self.m_module.get_main_function(self.m_builder) != None);
         self.m_gas_ptr_manager.get_gas_ptr()
     }
 
     pub fn get_gas(&self) -> BasicValueEnum {
-        self.m_builder.build_load(*self.get_gas_ptr(), "gas")
+        self.m_gas_ptr_manager.get_gas()
     }
 
     pub fn get_return_buf_data_p(&self) -> &PointerValue {
@@ -286,51 +343,6 @@ impl<'a> RuntimeManager<'a> {
     pub fn reset_return_buf(self) {
         self.m_return_buf_manager.reset_return_buf()
     }
-
-    fn get_main_function_with_builder(builder: & Builder, module: & Module) -> Option<FunctionValue> {
-        // The parent of the first basic block is a function
-
-        let bb = builder.get_insert_block();
-        assert!(bb != None);
-
-        let found_func = bb.unwrap().get_parent();
-        assert!(found_func != None);
-        let found_func_val = found_func.unwrap();
-
-        // The main function (by convention) is the first one in the module
-        let main_func = module.get_first_function();
-        assert!(main_func != None);
-
-        if found_func_val == main_func.unwrap() {
-            found_func
-        }
-        else {
-            None
-        }
-    }
-
-    pub fn get_main_function(&self) -> Option<FunctionValue> {
-        // The parent of the first basic block is a function
-
-        let bb = self.m_builder.get_insert_block();
-        assert!(bb != None);
-            
-        let found_func = bb.unwrap().get_parent();
-        assert!(found_func != None);
-        let found_func_val = found_func.unwrap();
-
-        // The main function (by convention) is the first one in the module
-        let main_func = self.m_module.get_first_function();
-        assert!(main_func != None);
-
-        if found_func_val == main_func.unwrap() {
-            found_func
-        }
-        else {
-            None
-        }
-    }
-    
 }
 
 #[cfg(test)]
@@ -363,6 +375,7 @@ mod tests {
         //let manager = RuntimeManager::new("main", &context, &builder, &module);
         let manager = RuntimeManager::new(&context, &builder, &module);
 
+        module.print_to_stderr();
 
         assert!(RuntimeDataType::is_rt_data_type(&manager.get_runtime_data_type()));
         assert!(RuntimeType::is_runtime_type(&manager.get_runtime_type()));
@@ -382,29 +395,40 @@ mod tests {
         MainFuncCreator::new ("main", &context, &builder, &module);
 
         // Generate IR for runtime type related items
-        let rt_type_manager = RuntimeTypeManager::new (&context, &builder);
+        let rt_type_manager = RuntimeTypeManager::new (&context, &builder, &module);
 
         // Create dummy function
 
-        let fn_type = context.void_type().fn_type(&[], false);
-        let my_fn = module.add_function("my_fn", fn_type, Some(External));
-        let entry_bb = context.append_basic_block(&my_fn, "entry");
-        builder.position_at_end(&entry_bb);
+        let main_fn_optional = module.get_function ("main");
+        assert!(main_fn_optional != None);
+
+        let main_fn = main_fn_optional.unwrap();
+        let gas_bb = context.append_basic_block(&main_fn, "gas_ptr_bb");
+
+        builder.position_at_end(&gas_bb);
 
         GasPtrManager::new(&context, &builder, rt_type_manager.get_gas());
 
-        let entry_block_optional = my_fn.get_first_basic_block();
-        assert!(entry_block_optional != None);
-        let entry_block = entry_block_optional.unwrap();
-        assert_eq!(*entry_block.get_name(), *CString::new("entry").unwrap());
-
-        assert!(entry_block.get_first_instruction() != None);
-        let first_insn = entry_block.get_first_instruction().unwrap();
+        module.print_to_stderr();
+        assert!(gas_bb.get_first_instruction() != None);
+        let first_insn = gas_bb.get_first_instruction().unwrap();
         assert_eq!(first_insn.get_opcode(), InstructionOpcode::Alloca);
 
         assert!(first_insn.get_next_instruction() != None);
         let second_insn = first_insn.get_next_instruction().unwrap();
         assert_eq!(second_insn.get_opcode(), InstructionOpcode::Store);
+        assert_eq!(second_insn.get_num_operands(), 2);
+
+        let store_operand0 = second_insn.get_operand(0).unwrap();
+        assert!(store_operand0.is_int_value());
+        assert_eq!(store_operand0.get_type().as_int_type().get_bit_width(), 64);
+
+        let store_operand1 = second_insn.get_operand(1).unwrap();
+        assert!(store_operand1.is_pointer_value());
+        let store_operand1_ptr_elt_t = store_operand1.into_pointer_value().get_type().get_element_type();
+
+        assert!(store_operand1_ptr_elt_t.is_int_type());
+        assert_eq!(store_operand1_ptr_elt_t.as_int_type().get_bit_width(), 64);
 
         assert!(second_insn.get_next_instruction() == None);
     }
@@ -423,7 +447,11 @@ mod tests {
         let entry_bb = context.append_basic_block(&my_fn, "entry");
         builder.position_at_end(&entry_bb);
 
-        ReturnBufferManager::new(&context, &builder);
+        let return_buf_mgr = ReturnBufferManager::new(&context, &builder);
+        return_buf_mgr.reset_return_buf();
+
+        module.print_to_stderr();
+
         let entry_block_optional = my_fn.get_first_basic_block();
         assert!(entry_block_optional != None);
         let entry_block = entry_block_optional.unwrap();
@@ -436,8 +464,20 @@ mod tests {
         assert!(first_insn.get_next_instruction() != None);
         let second_insn = first_insn.get_next_instruction().unwrap();
         assert_eq!(second_insn.get_opcode(), InstructionOpcode::Alloca);
+        assert!(second_insn.get_first_use() != None);
 
-        assert!(second_insn.get_next_instruction() == None);
+        assert!(second_insn.get_next_instruction() != None);
+        let third_insn = second_insn.get_next_instruction().unwrap();
+        assert_eq!(third_insn.get_opcode(), InstructionOpcode::Store);
+
+        let store_operand0 = third_insn.get_operand(0).unwrap();
+        assert!(store_operand0.is_int_value());
+        let store_operand0_value = store_operand0.into_int_value();
+        assert_eq!(store_operand0_value, context.i64_type().const_int(0, false));
+
+        // Make sure we are storing a zero into the alloca area
+        let store_operand_use1 = third_insn.get_operand_use(1).unwrap();
+        assert_eq!(second_insn.get_first_use().unwrap(), store_operand_use1);
     }
 
     #[test]
