@@ -4,6 +4,7 @@ use std::ffi::CString;
 use singletonum::{Singleton, SingletonInit};
 use inkwell::context::Context;
 use inkwell::builder::Builder;
+use inkwell::module::Module;
 use inkwell::types::StructType;
 use inkwell::types::PointerType;
 use inkwell::values::PointerValue;
@@ -24,6 +25,7 @@ use super::rt_data_type::RuntimeDataTypeFields::CodeSize;
 use super::rt_data_type::RuntimeDataTypeFields::Address;
 use super::rt_data_type::RuntimeDataTypeFields::Sender;
 use super::rt_data_type::RuntimeDataTypeFields::Depth;
+use evmjit::ModuleLookup;
 
 //use super::rt_data_type::NUM_RUNTIME_DATA_FIELDS;
 
@@ -132,15 +134,18 @@ impl RuntimeType {
 }
 
 #[derive(Debug, Copy, Clone)]
-pub struct RuntimeTypeManager {
+pub struct RuntimeTypeManager<'a> {
     m_data_ptr: BasicValueEnum,
     m_mem_ptr: PointerValue,
     m_env_ptr: BasicValueEnum,
     m_rt_data_elts: [BasicValueEnum; 10],
+    m_context:&'a Context,
+    m_builder: &'a Builder,
+    m_module: &'a Module,
 }
 
-impl RuntimeTypeManager {
-    pub fn new(context: &Context, builder: &Builder) -> RuntimeTypeManager {
+impl<'a> RuntimeTypeManager<'a> {
+    pub fn new(context: &'a Context, builder: &'a Builder, module: &'a Module) -> RuntimeTypeManager<'a> {
 
         let rt_ptr = RuntimeTypeManager::get_runtime_ptr_with_builder(&context, &builder);
         unsafe {
@@ -190,8 +195,15 @@ impl RuntimeTypeManager {
                                  builder.build_extract_value(data.into_struct_value(),
                                                              Depth.to_index() as u32,
                                                              Depth.to_name())],
+                m_context: context,
+                m_builder: builder,
+                m_module: module
             }
         }
+    }
+
+    pub fn get_runtime_ptr(&self) -> BasicValueEnum {
+        RuntimeTypeManager::get_runtime_ptr_with_builder(self.m_context, self.m_builder)
     }
 
     fn get_runtime_ptr_with_builder(context: & Context, builder: & Builder) -> BasicValueEnum {
@@ -217,8 +229,26 @@ impl RuntimeTypeManager {
         self.m_env_ptr
     }
 
-    pub fn get_data_ptr(self) -> BasicValueEnum {
-        self.m_data_ptr
+    pub fn get_data_ptr(&self) -> BasicValueEnum {
+        if self.m_module.get_main_function(self.m_builder) != None {
+            self.m_data_ptr
+        } else {
+            // If we are not in the main function, get a pointer to the runtime type
+            // which contains the data pointer
+
+            let runtime_ptr = self.get_runtime_ptr();
+            unsafe {
+                let temp = self.m_builder.build_struct_gep(runtime_ptr.into_pointer_value(), 0, "");
+
+                let data_p = self.m_builder.build_load(temp, "data");
+
+                assert!(data_p.is_pointer_value());
+                let elem_t = data_p.get_type().into_pointer_type().get_element_type();
+                assert!(elem_t.is_struct_type());
+                assert!(RuntimeDataType::is_rt_data_type(elem_t.as_struct_type()));
+                data_p
+            }
+        }
     }
 
     pub fn get_mem_ptr(self) -> PointerValue {
@@ -276,7 +306,7 @@ mod tests {
         // Need to create main function before RuntimeTypeManager otherwise we will crash
         MainFuncCreator::new ("main", &context, &builder, &module);
 
-        let manager = RuntimeTypeManager::new (&context, &builder);
+        let manager = RuntimeTypeManager::new (&context, &builder, &module);
         let env_ptr = manager.get_env_ptr();
 
         assert_eq!(env_ptr.get_type().into_pointer_type(), EnvDataType::get_instance(&context).get_ptr_type());
@@ -292,7 +322,7 @@ mod tests {
         // Need to create main function before RuntimeTypeManager otherwise we will crash
         MainFuncCreator::new ("main", &context, &builder, &module);
 
-        let manager = RuntimeTypeManager::new (&context, &builder);
+        let manager = RuntimeTypeManager::new (&context, &builder, &module);
         let data_ptr = manager.get_data_ptr();
 
         assert_eq!(data_ptr.get_type().into_pointer_type(), RuntimeDataType::get_instance(&context).get_ptr_type());
@@ -308,7 +338,7 @@ mod tests {
         // Need to create main function before RuntimeTypeManager otherwise we will crash
         MainFuncCreator::new ("main", &context, &builder, &module);
 
-        let manager = RuntimeTypeManager::new (&context, &builder);
+        let manager = RuntimeTypeManager::new (&context, &builder, &module);
         let mem_ptr = manager.get_mem_ptr();
 
         assert_eq!(mem_ptr.get_type(), MemoryRepresentationType::get_instance(&context).get_ptr_type());
@@ -323,7 +353,7 @@ mod tests {
 
         // Need to create main function before RuntimeTypeManager otherwise we will crash
         let main_func = MainFuncCreator::new ("main", &context, &builder, &module);
-        RuntimeTypeManager::new (&context, &builder);
+        RuntimeTypeManager::new (&context, &builder, &module);
 
         let entry_block = main_func.get_entry_bb();
 
