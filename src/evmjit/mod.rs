@@ -3,9 +3,48 @@ use inkwell::AddressSpace;
 use inkwell::types::BasicTypeEnum;
 use inkwell::attributes::Attribute;
 use inkwell::context::Context;
+use inkwell::builder::Builder;
+use inkwell::module::Module;
+use inkwell::values::FunctionValue;
 
 pub mod compiler;
 
+pub trait ModuleLookup {
+    fn in_main_function(&self, builder: & Builder) -> bool;
+    fn get_main_function(&self, builder: & Builder) -> Option<FunctionValue>;
+}
+
+impl ModuleLookup for Module {
+    fn get_main_function(&self, builder: & Builder) -> Option<FunctionValue> {
+        // The parent of the first basic block is a function
+
+        let bb = builder.get_insert_block();
+        assert!(bb != None);
+
+        let found_func = bb.unwrap().get_parent();
+        assert!(found_func != None);
+        let found_func_val = found_func.unwrap();
+
+        // The main function (by convention) is the first one in the module
+        let main_func = self.get_first_function();
+        assert!(main_func != None);
+
+        if found_func_val == main_func.unwrap() {
+            found_func
+        }
+        else {
+            None
+        }
+    }
+
+    fn in_main_function(&self, builder: & Builder) -> bool {
+        if self.get_main_function(builder) != None {
+            true
+        } else {
+            false
+        }
+    }
+}
 
 pub trait BasicTypeEnumCompare {
     fn is_int_t(self) -> bool;
