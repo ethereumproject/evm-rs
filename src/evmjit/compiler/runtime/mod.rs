@@ -233,7 +233,6 @@ pub struct RuntimeManager<'a> {
     m_module: &'a Module,
     m_txctx_manager:  TransactionContextManager<'a>,
     m_rt_type_manager: RuntimeTypeManager<'a>,
-//    m_main_func_creator: MainFuncCreator, 
     m_stack_allocator: StackAllocator,
     m_gas_ptr_manager: GasPtrManager<'a>,
     m_return_buf_manager: ReturnBufferManager<'a>,
@@ -242,10 +241,7 @@ pub struct RuntimeManager<'a> {
 
 impl<'a> RuntimeManager<'a> {
     pub fn new(context: &'a Context, builder: &'a Builder, module: &'a Module) -> RuntimeManager<'a> {
-    //pub fn new(main_func_name: &str, context: &'a Context, builder: &'a Builder, module: &'a Module) -> RuntimeManager<'a> {
 
-        // Generate outline of main function needed by 'RuntimeTypeManager
-        //let main_func_creator = MainFuncCreator::new (&main_func_name, &context, &builder, &module);
         let main_func_opt = module.get_main_function(builder);
         assert!(main_func_opt != None);
 
@@ -271,7 +267,6 @@ impl<'a> RuntimeManager<'a> {
             m_module: module,
             m_txctx_manager: txctx_manager,
             m_rt_type_manager: rt_type_manager,
-  //          m_main_func_creator: main_func_creator,
             m_stack_allocator: stack_allocator,
             m_gas_ptr_manager: gas_ptr_mgr,
             m_return_buf_manager: return_buf_mgr,
@@ -350,7 +345,8 @@ mod tests {
     use std::ffi::CString;
     use super::*;
     use inkwell::values::InstructionOpcode;
-    use inkwell::values::BasicValue;
+    use self::txctx::TransactionContextType;
+    use self::env::EnvDataType;
 
     #[test]
     fn test_data_field_to_index() {
@@ -409,7 +405,6 @@ mod tests {
 
         GasPtrManager::new(&context, &builder, rt_type_manager.get_gas());
 
-        module.print_to_stderr();
         assert!(gas_bb.get_first_instruction() != None);
         let first_insn = gas_bb.get_first_instruction().unwrap();
         assert_eq!(first_insn.get_opcode(), InstructionOpcode::Alloca);
@@ -449,8 +444,6 @@ mod tests {
 
         let return_buf_mgr = ReturnBufferManager::new(&context, &builder);
         return_buf_mgr.reset_return_buf();
-
-        module.print_to_stderr();
 
         let entry_block_optional = my_fn.get_first_basic_block();
         assert!(entry_block_optional != None);
@@ -492,21 +485,16 @@ mod tests {
 
         let manager = RuntimeManager::new(&context, &builder, &module);
 
-        // Create dummy function
-
         let main_fn_optional = module.get_function ("main");
         assert!(main_fn_optional != None);
 
         let main_fn = main_fn_optional.unwrap();
-        let gas_bb = context.append_basic_block(&main_fn, "gas");
+        let gas_bb = context.append_basic_block(&main_fn, "gasprice");
 
         builder.position_at_end(&gas_bb);
 
         // This call will generate some ir code for us to test
         manager.gen_tx_ctx_item_ir(TransactionContextTypeFields::GasPrice);
-
-        module.print_to_stderr();
-
 
         assert!(gas_bb.get_first_instruction() != None);
         let first_insn = gas_bb.get_first_instruction().unwrap();
@@ -514,45 +502,59 @@ mod tests {
         assert_eq!(first_insn.get_num_operands(), 4);
 
         let call_operand0 = first_insn.get_operand(0).unwrap();
-        let call_operand0_instruction = call_operand0.as_instruction_value().unwrap();
 
         assert!(call_operand0.is_pointer_value());   // should be i1 *
-
-        // Instruction that generated ssa var of operand 0 of call is alloca
-        assert_eq!(call_operand0_instruction.get_opcode(), InstructionOpcode::Alloca);
-        let alloca_operand0 = call_operand0_instruction.get_operand(0).unwrap();
-        assert!(alloca_operand0.is_int_value());
-
-        let alloca_arg_t = context.i32_type();
-
-        // Operand 0 of alloca is a '1', meaning reserve space for 1 byte
-        assert_eq!(alloca_operand0.into_int_value(), alloca_arg_t.const_int(1, false));
-
-
-
+        let call_operand0_ptr_elt_t = call_operand0.into_pointer_value().get_type().get_element_type();
+        assert!(call_operand0_ptr_elt_t.is_int_type());
+        assert!(call_operand0_ptr_elt_t.into_int_type().get_bit_width() == 1);
 
         let call_operand1 = first_insn.get_operand(1).unwrap();
-        let call_operand1_instruction = call_operand1.as_instruction_value().unwrap();
 
-        assert_ne!(call_operand0, call_operand1);
         assert!(call_operand1.is_pointer_value());   // should be evm.txctx *
 
-        // Instruction that generated ssa var of operand 0 of call is alloca
-        assert_eq!(call_operand1_instruction.get_opcode(), InstructionOpcode::Alloca);
-        let alloca_operand1 = call_operand1_instruction.get_operand(0).unwrap();
-        assert!(alloca_operand1.is_int_value());
+        let call_operand1_ptr_elt_t = call_operand1.into_pointer_value().get_type().get_element_type();
+        assert!(call_operand1_ptr_elt_t.is_struct_type());
+        assert!(TransactionContextType::is_transaction_context_type(&call_operand1_ptr_elt_t.as_struct_type()));
 
-        // Operand 0 of alloca is a '1', meaning reserve space for one
+        let call_operand2 = first_insn.get_operand(2).unwrap();
+        assert!(call_operand2.is_pointer_value());   // should be Env *
 
-        assert_eq!(alloca_operand1.into_int_value(), alloca_arg_t.const_int(1, false));
+        let call_operand2_ptr_elt_t = call_operand2.into_pointer_value().get_type().get_element_type();
+        assert!(call_operand2_ptr_elt_t.is_struct_type());
+
+        assert!(EnvDataType::is_env_data_type(&call_operand2_ptr_elt_t.as_struct_type()));
 
         assert!(first_insn.get_next_instruction() != None);
         let second_insn = first_insn.get_next_instruction().unwrap();
         assert_eq!(second_insn.get_opcode(), InstructionOpcode::GetElementPtr);
 
+        assert_eq!(second_insn.get_num_operands(), 3);
+
+        let gep_operand0 = second_insn.get_operand(0).unwrap();
+        assert!(gep_operand0.is_pointer_value());
+        let gep_operand0_ptr_elt_t = gep_operand0.into_pointer_value().get_type().get_element_type();
+        assert!(gep_operand0_ptr_elt_t.is_struct_type());
+        let gep_operand0_type = gep_operand0_ptr_elt_t.into_struct_type();
+        assert!(TransactionContextType::is_transaction_context_type(&gep_operand0_type));
+
+        let gep_operand1 = second_insn.get_operand(1).unwrap();
+        assert!(gep_operand1.is_int_value());
+        assert_eq!(gep_operand1.into_int_value(), context.i32_type().const_int(0, false));
+
+        let gep_operand2 = second_insn.get_operand(2).unwrap();
+        assert!(gep_operand2.is_int_value());
+        assert_eq!(gep_operand2.into_int_value(), context.i32_type().const_int(0, false));
+
         assert!(second_insn.get_next_instruction() != None);
         let third_insn = second_insn.get_next_instruction().unwrap();
         assert_eq!(third_insn.get_opcode(), InstructionOpcode::Load);
+
+        let load_operand0 = third_insn.get_operand(0).unwrap();
+        assert!(load_operand0.is_pointer_value());
+
+        let load_operand0_ptr_elt_t = load_operand0.into_pointer_value().get_type().get_element_type();
+        assert!(load_operand0_ptr_elt_t.is_int_type());
+        assert!(load_operand0_ptr_elt_t.into_int_type().get_bit_width() == 256);
 
         assert!(third_insn.get_next_instruction() == None);
     }
@@ -568,29 +570,65 @@ mod tests {
         MainFuncCreator::new ("main", &context, &builder, &module);
         let manager = RuntimeManager::new(&context, &builder, &module);
 
-        // Create dummy function
+        let main_fn_optional = module.get_function ("main");
+        assert!(main_fn_optional != None);
 
-        let fn_type = context.void_type().fn_type(&[], false);
-        let my_fn = module.add_function("my_fn", fn_type, Some(External));
-        let entry_bb = context.append_basic_block(&my_fn, "entry");
+        let main_fn = main_fn_optional.unwrap();
+        let origin_bb = context.append_basic_block(&main_fn, "Origin");
 
-        builder.position_at_end(&entry_bb);
+        builder.position_at_end(&origin_bb);
 
         // This call will generate some ir code for us to test
         manager.gen_tx_ctx_item_ir(TransactionContextTypeFields::Origin);
 
-        let entry_block_optional = my_fn.get_first_basic_block();
-        assert!(entry_block_optional != None);
-        let entry_block = entry_block_optional.unwrap();
-        assert_eq!(*entry_block.get_name(), *CString::new("entry").unwrap());
-
-        assert!(entry_block.get_first_instruction() != None);
-        let first_insn = entry_block.get_first_instruction().unwrap();
+        assert!(origin_bb.get_first_instruction() != None);
+        let first_insn = origin_bb.get_first_instruction().unwrap();
         assert_eq!(first_insn.get_opcode(), InstructionOpcode::Call);
+        assert_eq!(first_insn.get_num_operands(), 4);
+
+        let call_operand0 = first_insn.get_operand(0).unwrap();
+
+        assert!(call_operand0.is_pointer_value());   // should be i1 *
+        let call_operand0_ptr_elt_t = call_operand0.into_pointer_value().get_type().get_element_type();
+        assert!(call_operand0_ptr_elt_t.is_int_type());
+        assert!(call_operand0_ptr_elt_t.into_int_type().get_bit_width() == 1);
+
+        let call_operand1 = first_insn.get_operand(1).unwrap();
+
+        assert!(call_operand1.is_pointer_value());   // should be evm.txctx *
+
+        let call_operand1_ptr_elt_t = call_operand1.into_pointer_value().get_type().get_element_type();
+        assert!(call_operand1_ptr_elt_t.is_struct_type());
+        assert!(TransactionContextType::is_transaction_context_type(&call_operand1_ptr_elt_t.as_struct_type()));
+
+        let call_operand2 = first_insn.get_operand(2).unwrap();
+        assert!(call_operand2.is_pointer_value());   // should be Env *
+
+        let call_operand2_ptr_elt_t = call_operand2.into_pointer_value().get_type().get_element_type();
+        assert!(call_operand2_ptr_elt_t.is_struct_type());
+
+        assert!(EnvDataType::is_env_data_type(&call_operand2_ptr_elt_t.as_struct_type()));
 
         assert!(first_insn.get_next_instruction() != None);
         let second_insn = first_insn.get_next_instruction().unwrap();
         assert_eq!(second_insn.get_opcode(), InstructionOpcode::GetElementPtr);
+
+        assert_eq!(second_insn.get_num_operands(), 3);
+
+        let gep_operand0 = second_insn.get_operand(0).unwrap();
+        assert!(gep_operand0.is_pointer_value());
+        let gep_operand0_ptr_elt_t = gep_operand0.into_pointer_value().get_type().get_element_type();
+        assert!(gep_operand0_ptr_elt_t.is_struct_type());
+        let gep_operand0_type = gep_operand0_ptr_elt_t.into_struct_type();
+        assert!(TransactionContextType::is_transaction_context_type(&gep_operand0_type));
+
+        let gep_operand1 = second_insn.get_operand(1).unwrap();
+        assert!(gep_operand1.is_int_value());
+        assert_eq!(gep_operand1.into_int_value(), context.i32_type().const_int(0, false));
+
+        let gep_operand2 = second_insn.get_operand(2).unwrap();
+        assert!(gep_operand2.is_int_value());
+        assert_eq!(gep_operand2.into_int_value(), context.i32_type().const_int(1, false));
 
         assert!(second_insn.get_next_instruction() != None);
         let third_insn = second_insn.get_next_instruction().unwrap();
@@ -599,6 +637,13 @@ mod tests {
         assert!(third_insn.get_next_instruction() != None);
         let fourth_insn = third_insn.get_next_instruction().unwrap();
         assert_eq!(fourth_insn.get_opcode(), InstructionOpcode::Load);
+
+        let load_operand0 = fourth_insn.get_operand(0).unwrap();
+        assert!(load_operand0.is_pointer_value());
+
+        let load_operand0_ptr_elt_t = load_operand0.into_pointer_value().get_type().get_element_type();
+        assert!(load_operand0_ptr_elt_t.is_int_type());
+        assert!(load_operand0_ptr_elt_t.into_int_type().get_bit_width() == 160);
 
         assert!(fourth_insn.get_next_instruction() == None);
     }
@@ -615,29 +660,65 @@ mod tests {
 
         let manager = RuntimeManager::new(&context, &builder, &module);
 
-        // Create dummy function
+        let main_fn_optional = module.get_function ("main");
+        assert!(main_fn_optional != None);
 
-        let fn_type = context.void_type().fn_type(&[], false);
-        let my_fn = module.add_function("my_fn", fn_type, Some(External));
-        let entry_bb = context.append_basic_block(&my_fn, "entry");
+        let main_fn = main_fn_optional.unwrap();
+        let coinbase_bb = context.append_basic_block(&main_fn, "Coinbase");
 
-        builder.position_at_end(&entry_bb);
+        builder.position_at_end(&coinbase_bb);
 
         // This call will generate some ir code for us to test
         manager.gen_tx_ctx_item_ir(TransactionContextTypeFields::CoinBase);
 
-        let entry_block_optional = my_fn.get_first_basic_block();
-        assert!(entry_block_optional != None);
-        let entry_block = entry_block_optional.unwrap();
-        assert_eq!(*entry_block.get_name(), *CString::new("entry").unwrap());
-
-        assert!(entry_block.get_first_instruction() != None);
-        let first_insn = entry_block.get_first_instruction().unwrap();
+        assert!(coinbase_bb.get_first_instruction() != None);
+        let first_insn = coinbase_bb.get_first_instruction().unwrap();
         assert_eq!(first_insn.get_opcode(), InstructionOpcode::Call);
+        assert_eq!(first_insn.get_num_operands(), 4);
+
+        let call_operand0 = first_insn.get_operand(0).unwrap();
+
+        assert!(call_operand0.is_pointer_value());   // should be i1 *
+        let call_operand0_ptr_elt_t = call_operand0.into_pointer_value().get_type().get_element_type();
+        assert!(call_operand0_ptr_elt_t.is_int_type());
+        assert!(call_operand0_ptr_elt_t.into_int_type().get_bit_width() == 1);
+
+        let call_operand1 = first_insn.get_operand(1).unwrap();
+
+        assert!(call_operand1.is_pointer_value());   // should be evm.txctx *
+
+        let call_operand1_ptr_elt_t = call_operand1.into_pointer_value().get_type().get_element_type();
+        assert!(call_operand1_ptr_elt_t.is_struct_type());
+        assert!(TransactionContextType::is_transaction_context_type(&call_operand1_ptr_elt_t.as_struct_type()));
+
+        let call_operand2 = first_insn.get_operand(2).unwrap();
+        assert!(call_operand2.is_pointer_value());   // should be Env *
+
+        let call_operand2_ptr_elt_t = call_operand2.into_pointer_value().get_type().get_element_type();
+        assert!(call_operand2_ptr_elt_t.is_struct_type());
+
+        assert!(EnvDataType::is_env_data_type(&call_operand2_ptr_elt_t.as_struct_type()));
 
         assert!(first_insn.get_next_instruction() != None);
         let second_insn = first_insn.get_next_instruction().unwrap();
         assert_eq!(second_insn.get_opcode(), InstructionOpcode::GetElementPtr);
+
+        assert_eq!(second_insn.get_num_operands(), 3);
+
+        let gep_operand0 = second_insn.get_operand(0).unwrap();
+        assert!(gep_operand0.is_pointer_value());
+        let gep_operand0_ptr_elt_t = gep_operand0.into_pointer_value().get_type().get_element_type();
+        assert!(gep_operand0_ptr_elt_t.is_struct_type());
+        let gep_operand0_type = gep_operand0_ptr_elt_t.into_struct_type();
+        assert!(TransactionContextType::is_transaction_context_type(&gep_operand0_type));
+
+        let gep_operand1 = second_insn.get_operand(1).unwrap();
+        assert!(gep_operand1.is_int_value());
+        assert_eq!(gep_operand1.into_int_value(), context.i32_type().const_int(0, false));
+
+        let gep_operand2 = second_insn.get_operand(2).unwrap();
+        assert!(gep_operand2.is_int_value());
+        assert_eq!(gep_operand2.into_int_value(), context.i32_type().const_int(2, false));
 
         assert!(second_insn.get_next_instruction() != None);
         let third_insn = second_insn.get_next_instruction().unwrap();
@@ -647,7 +728,358 @@ mod tests {
         let fourth_insn = third_insn.get_next_instruction().unwrap();
         assert_eq!(fourth_insn.get_opcode(), InstructionOpcode::Load);
 
+        let load_operand0 = fourth_insn.get_operand(0).unwrap();
+        assert!(load_operand0.is_pointer_value());
+
+        let load_operand0_ptr_elt_t = load_operand0.into_pointer_value().get_type().get_element_type();
+        assert!(load_operand0_ptr_elt_t.is_int_type());
+        assert!(load_operand0_ptr_elt_t.into_int_type().get_bit_width() == 160);
+
         assert!(fourth_insn.get_next_instruction() == None);
+    }
+
+    #[test]
+    fn test_get_tx_ctx_item_number() {
+        use super::MainFuncCreator;
+        let context = Context::create();
+        let module = context.create_module("my_module");
+        let builder = context.create_builder();
+
+        // Need to create main function before TransactionConextManager otherwise we will crash
+        MainFuncCreator::new ("main", &context, &builder, &module);
+
+        let manager = RuntimeManager::new(&context, &builder, &module);
+
+        let main_fn_optional = module.get_function ("main");
+        assert!(main_fn_optional != None);
+
+        let main_fn = main_fn_optional.unwrap();
+        let number_bb = context.append_basic_block(&main_fn, "number");
+
+        builder.position_at_end(&number_bb);
+
+        // This call will generate some ir code for us to test
+        manager.gen_tx_ctx_item_ir(TransactionContextTypeFields::Number);
+
+        assert!(number_bb.get_first_instruction() != None);
+        let first_insn = number_bb.get_first_instruction().unwrap();
+        assert_eq!(first_insn.get_opcode(), InstructionOpcode::Call);
+        assert_eq!(first_insn.get_num_operands(), 4);
+
+        let call_operand0 = first_insn.get_operand(0).unwrap();
+
+        assert!(call_operand0.is_pointer_value());   // should be i1 *
+        let call_operand0_ptr_elt_t = call_operand0.into_pointer_value().get_type().get_element_type();
+        assert!(call_operand0_ptr_elt_t.is_int_type());
+        assert!(call_operand0_ptr_elt_t.into_int_type().get_bit_width() == 1);
+
+        let call_operand1 = first_insn.get_operand(1).unwrap();
+
+        assert!(call_operand1.is_pointer_value());   // should be evm.txctx *
+
+        let call_operand1_ptr_elt_t = call_operand1.into_pointer_value().get_type().get_element_type();
+        assert!(call_operand1_ptr_elt_t.is_struct_type());
+        assert!(TransactionContextType::is_transaction_context_type(&call_operand1_ptr_elt_t.as_struct_type()));
+
+        let call_operand2 = first_insn.get_operand(2).unwrap();
+        assert!(call_operand2.is_pointer_value());   // should be Env *
+
+        let call_operand2_ptr_elt_t = call_operand2.into_pointer_value().get_type().get_element_type();
+        assert!(call_operand2_ptr_elt_t.is_struct_type());
+
+        assert!(EnvDataType::is_env_data_type(&call_operand2_ptr_elt_t.as_struct_type()));
+
+        assert!(first_insn.get_next_instruction() != None);
+        let second_insn = first_insn.get_next_instruction().unwrap();
+        assert_eq!(second_insn.get_opcode(), InstructionOpcode::GetElementPtr);
+
+        assert_eq!(second_insn.get_num_operands(), 3);
+
+        let gep_operand0 = second_insn.get_operand(0).unwrap();
+        assert!(gep_operand0.is_pointer_value());
+        let gep_operand0_ptr_elt_t = gep_operand0.into_pointer_value().get_type().get_element_type();
+        assert!(gep_operand0_ptr_elt_t.is_struct_type());
+        let gep_operand0_type = gep_operand0_ptr_elt_t.into_struct_type();
+        assert!(TransactionContextType::is_transaction_context_type(&gep_operand0_type));
+
+        let gep_operand1 = second_insn.get_operand(1).unwrap();
+        assert!(gep_operand1.is_int_value());
+        assert_eq!(gep_operand1.into_int_value(), context.i32_type().const_int(0, false));
+
+        let gep_operand2 = second_insn.get_operand(2).unwrap();
+        assert!(gep_operand2.is_int_value());
+        assert_eq!(gep_operand2.into_int_value(), context.i32_type().const_int(3, false));
+
+        assert!(second_insn.get_next_instruction() != None);
+        let third_insn = second_insn.get_next_instruction().unwrap();
+        assert_eq!(third_insn.get_opcode(), InstructionOpcode::Load);
+
+        let load_operand0 = third_insn.get_operand(0).unwrap();
+        assert!(load_operand0.is_pointer_value());
+
+        let load_operand0_ptr_elt_t = load_operand0.into_pointer_value().get_type().get_element_type();
+        assert!(load_operand0_ptr_elt_t.is_int_type());
+        assert!(load_operand0_ptr_elt_t.into_int_type().get_bit_width() == 64);
+
+        assert!(third_insn.get_next_instruction() == None);
+    }
+
+    #[test]
+    fn test_get_tx_ctx_item_timestamp() {
+        use super::MainFuncCreator;
+        let context = Context::create();
+        let module = context.create_module("my_module");
+        let builder = context.create_builder();
+
+        // Need to create main function before TransactionConextManager otherwise we will crash
+        MainFuncCreator::new ("main", &context, &builder, &module);
+
+        let manager = RuntimeManager::new(&context, &builder, &module);
+
+        let main_fn_optional = module.get_function ("main");
+        assert!(main_fn_optional != None);
+
+        let main_fn = main_fn_optional.unwrap();
+        let timestamp_bb = context.append_basic_block(&main_fn, "timestamp");
+
+        builder.position_at_end(&timestamp_bb);
+
+        // This call will generate some ir code for us to test
+        manager.gen_tx_ctx_item_ir(TransactionContextTypeFields::TimeStamp);
+
+        assert!(timestamp_bb.get_first_instruction() != None);
+        let first_insn = timestamp_bb.get_first_instruction().unwrap();
+        assert_eq!(first_insn.get_opcode(), InstructionOpcode::Call);
+        assert_eq!(first_insn.get_num_operands(), 4);
+
+        let call_operand0 = first_insn.get_operand(0).unwrap();
+
+        assert!(call_operand0.is_pointer_value());   // should be i1 *
+        let call_operand0_ptr_elt_t = call_operand0.into_pointer_value().get_type().get_element_type();
+        assert!(call_operand0_ptr_elt_t.is_int_type());
+        assert!(call_operand0_ptr_elt_t.into_int_type().get_bit_width() == 1);
+
+        let call_operand1 = first_insn.get_operand(1).unwrap();
+
+        assert!(call_operand1.is_pointer_value());   // should be evm.txctx *
+
+        let call_operand1_ptr_elt_t = call_operand1.into_pointer_value().get_type().get_element_type();
+        assert!(call_operand1_ptr_elt_t.is_struct_type());
+        assert!(TransactionContextType::is_transaction_context_type(&call_operand1_ptr_elt_t.as_struct_type()));
+
+        let call_operand2 = first_insn.get_operand(2).unwrap();
+        assert!(call_operand2.is_pointer_value());   // should be Env *
+
+        let call_operand2_ptr_elt_t = call_operand2.into_pointer_value().get_type().get_element_type();
+        assert!(call_operand2_ptr_elt_t.is_struct_type());
+
+        assert!(EnvDataType::is_env_data_type(&call_operand2_ptr_elt_t.as_struct_type()));
+
+        assert!(first_insn.get_next_instruction() != None);
+        let second_insn = first_insn.get_next_instruction().unwrap();
+        assert_eq!(second_insn.get_opcode(), InstructionOpcode::GetElementPtr);
+
+        assert_eq!(second_insn.get_num_operands(), 3);
+
+        let gep_operand0 = second_insn.get_operand(0).unwrap();
+        assert!(gep_operand0.is_pointer_value());
+        let gep_operand0_ptr_elt_t = gep_operand0.into_pointer_value().get_type().get_element_type();
+        assert!(gep_operand0_ptr_elt_t.is_struct_type());
+        let gep_operand0_type = gep_operand0_ptr_elt_t.into_struct_type();
+        assert!(TransactionContextType::is_transaction_context_type(&gep_operand0_type));
+
+        let gep_operand1 = second_insn.get_operand(1).unwrap();
+        assert!(gep_operand1.is_int_value());
+        assert_eq!(gep_operand1.into_int_value(), context.i32_type().const_int(0, false));
+
+        let gep_operand2 = second_insn.get_operand(2).unwrap();
+        assert!(gep_operand2.is_int_value());
+        assert_eq!(gep_operand2.into_int_value(), context.i32_type().const_int(4, false));
+
+        assert!(second_insn.get_next_instruction() != None);
+        let third_insn = second_insn.get_next_instruction().unwrap();
+        assert_eq!(third_insn.get_opcode(), InstructionOpcode::Load);
+
+        let load_operand0 = third_insn.get_operand(0).unwrap();
+        assert!(load_operand0.is_pointer_value());
+
+        let load_operand0_ptr_elt_t = load_operand0.into_pointer_value().get_type().get_element_type();
+        assert!(load_operand0_ptr_elt_t.is_int_type());
+        assert!(load_operand0_ptr_elt_t.into_int_type().get_bit_width() == 64);
+
+        assert!(third_insn.get_next_instruction() == None);
+    }
+
+    #[test]
+    fn test_get_tx_ctx_item_gaslimit() {
+        use super::MainFuncCreator;
+        let context = Context::create();
+        let module = context.create_module("my_module");
+        let builder = context.create_builder();
+
+        // Need to create main function before TransactionConextManager otherwise we will crash
+        MainFuncCreator::new ("main", &context, &builder, &module);
+
+        let manager = RuntimeManager::new(&context, &builder, &module);
+
+        let main_fn_optional = module.get_function ("main");
+        assert!(main_fn_optional != None);
+
+        let main_fn = main_fn_optional.unwrap();
+        let gaslimit_bb = context.append_basic_block(&main_fn, "gaslimit");
+
+        builder.position_at_end(&gaslimit_bb);
+
+        // This call will generate some ir code for us to test
+        manager.gen_tx_ctx_item_ir(TransactionContextTypeFields::GasLimit);
+
+        assert!(gaslimit_bb.get_first_instruction() != None);
+        let first_insn = gaslimit_bb.get_first_instruction().unwrap();
+        assert_eq!(first_insn.get_opcode(), InstructionOpcode::Call);
+        assert_eq!(first_insn.get_num_operands(), 4);
+
+        let call_operand0 = first_insn.get_operand(0).unwrap();
+
+        assert!(call_operand0.is_pointer_value());   // should be i1 *
+        let call_operand0_ptr_elt_t = call_operand0.into_pointer_value().get_type().get_element_type();
+        assert!(call_operand0_ptr_elt_t.is_int_type());
+        assert!(call_operand0_ptr_elt_t.into_int_type().get_bit_width() == 1);
+
+        let call_operand1 = first_insn.get_operand(1).unwrap();
+
+        assert!(call_operand1.is_pointer_value());   // should be evm.txctx *
+
+        let call_operand1_ptr_elt_t = call_operand1.into_pointer_value().get_type().get_element_type();
+        assert!(call_operand1_ptr_elt_t.is_struct_type());
+        assert!(TransactionContextType::is_transaction_context_type(&call_operand1_ptr_elt_t.as_struct_type()));
+
+        let call_operand2 = first_insn.get_operand(2).unwrap();
+        assert!(call_operand2.is_pointer_value());   // should be Env *
+
+        let call_operand2_ptr_elt_t = call_operand2.into_pointer_value().get_type().get_element_type();
+        assert!(call_operand2_ptr_elt_t.is_struct_type());
+
+        assert!(EnvDataType::is_env_data_type(&call_operand2_ptr_elt_t.as_struct_type()));
+
+        assert!(first_insn.get_next_instruction() != None);
+        let second_insn = first_insn.get_next_instruction().unwrap();
+        assert_eq!(second_insn.get_opcode(), InstructionOpcode::GetElementPtr);
+
+        assert_eq!(second_insn.get_num_operands(), 3);
+
+        let gep_operand0 = second_insn.get_operand(0).unwrap();
+        assert!(gep_operand0.is_pointer_value());
+        let gep_operand0_ptr_elt_t = gep_operand0.into_pointer_value().get_type().get_element_type();
+        assert!(gep_operand0_ptr_elt_t.is_struct_type());
+        let gep_operand0_type = gep_operand0_ptr_elt_t.into_struct_type();
+        assert!(TransactionContextType::is_transaction_context_type(&gep_operand0_type));
+
+        let gep_operand1 = second_insn.get_operand(1).unwrap();
+        assert!(gep_operand1.is_int_value());
+        assert_eq!(gep_operand1.into_int_value(), context.i32_type().const_int(0, false));
+
+        let gep_operand2 = second_insn.get_operand(2).unwrap();
+        assert!(gep_operand2.is_int_value());
+        assert_eq!(gep_operand2.into_int_value(), context.i32_type().const_int(5, false));
+
+        assert!(second_insn.get_next_instruction() != None);
+        let third_insn = second_insn.get_next_instruction().unwrap();
+        assert_eq!(third_insn.get_opcode(), InstructionOpcode::Load);
+
+        let load_operand0 = third_insn.get_operand(0).unwrap();
+        assert!(load_operand0.is_pointer_value());
+
+        let load_operand0_ptr_elt_t = load_operand0.into_pointer_value().get_type().get_element_type();
+        assert!(load_operand0_ptr_elt_t.is_int_type());
+        assert!(load_operand0_ptr_elt_t.into_int_type().get_bit_width() == 64);
+
+        assert!(third_insn.get_next_instruction() == None);
+    }
+
+    #[test]
+    fn test_get_tx_ctx_item_difficulty() {
+        use super::MainFuncCreator;
+        let context = Context::create();
+        let module = context.create_module("my_module");
+        let builder = context.create_builder();
+
+        // Need to create main function before TransactionConextManager otherwise we will crash
+        MainFuncCreator::new ("main", &context, &builder, &module);
+
+        let manager = RuntimeManager::new(&context, &builder, &module);
+
+        let main_fn_optional = module.get_function ("main");
+        assert!(main_fn_optional != None);
+
+        let main_fn = main_fn_optional.unwrap();
+        let difficulty_bb = context.append_basic_block(&main_fn, "difficulty");
+
+        builder.position_at_end(&difficulty_bb);
+
+        // This call will generate some ir code for us to test
+        manager.gen_tx_ctx_item_ir(TransactionContextTypeFields::Difficulty);
+
+        assert!(difficulty_bb.get_first_instruction() != None);
+        let first_insn = difficulty_bb.get_first_instruction().unwrap();
+        assert_eq!(first_insn.get_opcode(), InstructionOpcode::Call);
+        assert_eq!(first_insn.get_num_operands(), 4);
+
+        let call_operand0 = first_insn.get_operand(0).unwrap();
+
+        assert!(call_operand0.is_pointer_value());   // should be i1 *
+        let call_operand0_ptr_elt_t = call_operand0.into_pointer_value().get_type().get_element_type();
+        assert!(call_operand0_ptr_elt_t.is_int_type());
+        assert!(call_operand0_ptr_elt_t.into_int_type().get_bit_width() == 1);
+
+        let call_operand1 = first_insn.get_operand(1).unwrap();
+
+        assert!(call_operand1.is_pointer_value());   // should be evm.txctx *
+
+        let call_operand1_ptr_elt_t = call_operand1.into_pointer_value().get_type().get_element_type();
+        assert!(call_operand1_ptr_elt_t.is_struct_type());
+        assert!(TransactionContextType::is_transaction_context_type(&call_operand1_ptr_elt_t.as_struct_type()));
+
+        let call_operand2 = first_insn.get_operand(2).unwrap();
+        assert!(call_operand2.is_pointer_value());   // should be Env *
+
+        let call_operand2_ptr_elt_t = call_operand2.into_pointer_value().get_type().get_element_type();
+        assert!(call_operand2_ptr_elt_t.is_struct_type());
+
+        assert!(EnvDataType::is_env_data_type(&call_operand2_ptr_elt_t.as_struct_type()));
+
+        assert!(first_insn.get_next_instruction() != None);
+        let second_insn = first_insn.get_next_instruction().unwrap();
+        assert_eq!(second_insn.get_opcode(), InstructionOpcode::GetElementPtr);
+
+        assert_eq!(second_insn.get_num_operands(), 3);
+
+        let gep_operand0 = second_insn.get_operand(0).unwrap();
+        assert!(gep_operand0.is_pointer_value());
+        let gep_operand0_ptr_elt_t = gep_operand0.into_pointer_value().get_type().get_element_type();
+        assert!(gep_operand0_ptr_elt_t.is_struct_type());
+        let gep_operand0_type = gep_operand0_ptr_elt_t.into_struct_type();
+        assert!(TransactionContextType::is_transaction_context_type(&gep_operand0_type));
+
+        let gep_operand1 = second_insn.get_operand(1).unwrap();
+        assert!(gep_operand1.is_int_value());
+        assert_eq!(gep_operand1.into_int_value(), context.i32_type().const_int(0, false));
+
+        let gep_operand2 = second_insn.get_operand(2).unwrap();
+        assert!(gep_operand2.is_int_value());
+        assert_eq!(gep_operand2.into_int_value(), context.i32_type().const_int(6, false));
+
+        assert!(second_insn.get_next_instruction() != None);
+        let third_insn = second_insn.get_next_instruction().unwrap();
+        assert_eq!(third_insn.get_opcode(), InstructionOpcode::Load);
+
+        let load_operand0 = third_insn.get_operand(0).unwrap();
+        assert!(load_operand0.is_pointer_value());
+
+        let load_operand0_ptr_elt_t = load_operand0.into_pointer_value().get_type().get_element_type();
+        assert!(load_operand0_ptr_elt_t.is_int_type());
+        assert!(load_operand0_ptr_elt_t.into_int_type().get_bit_width() == 256);
+
+        assert!(third_insn.get_next_instruction() == None);
     }
 
 }
