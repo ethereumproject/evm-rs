@@ -229,6 +229,18 @@ impl ValidTransaction {
         is_static: bool) -> Result<Context, RequireError> {
         let address = self.address();
 
+        // Calculate gas with overflow checks
+        let gas_limit: U256 = self.gas_limit.into();
+        let upfront: U256 = upfront.into();
+        let new_gas_limit = gas_limit.saturating_sub(upfront);
+        trace!("gas_limit({}) - upfront({}) = {}", gas_limit, upfront, new_gas_limit);
+        let gas_limit = Gas::from(gas_limit);
+
+        // print a warning if gas limit have zeroed out
+        if gas_limit == Gas::zero() {
+            warn!("gas limit saturated to zero");
+        }
+
         match self.action {
             TransactionAction::Call(_) => {
                 if self.caller.is_some() {
@@ -247,7 +259,7 @@ impl ValidTransaction {
                     data: self.input,
                     gas_price: self.gas_price,
                     value: self.value,
-                    gas_limit: self.gas_limit - upfront,
+                    gas_limit,
                     code: account_state.code(address).unwrap(),
                     origin: origin.unwrap_or(self.caller.unwrap_or(system_address!())),
                     apprent_value: self.value,
@@ -267,7 +279,7 @@ impl ValidTransaction {
                     caller: self.caller.unwrap_or(system_address!()),
                     gas_price: self.gas_price,
                     value: self.value,
-                    gas_limit: self.gas_limit - upfront,
+                    gas_limit,
                     data: Rc::new(Vec::new()),
                     code: self.input,
                     origin: origin.unwrap_or(self.caller.unwrap_or(system_address!())),
@@ -571,7 +583,11 @@ impl<M: Memory, P: Patch + Clone> VM for TransactionVM<M, P> {
                 let total_used = vm.machines[0].state().total_used_gas() + intrinsic_gas;
                 let refund_cap = total_used / Gas::from(2u64);
                 let refunded = min(refund_cap, vm.machines[0].state().refunded_gas);
-                total_used - refunded
+                let gas_cost = total_used - refunded;
+                debug!("total used gas:      {:?}", total_used);
+                debug!("total refunded:      {:?}", refunded);
+                debug!("execution gas cost:  {:?}", gas_cost);
+                gas_cost
             }
             TransactionVMState::Constructing { .. } => Gas::zero(),
         }

@@ -463,6 +463,10 @@ impl<M: Memory, P: Patch + Clone> VM for ContextVM<M, P> {
         let total_used = self.machines[0].state().total_used_gas();
         let refund_cap = total_used / Gas::from(2u64);
         let refunded = min(refund_cap, self.machines[0].state().refunded_gas);
-        total_used - refunded
+        let gas_cost = total_used - refunded;
+        debug!("total used gas: {:?}", total_used);
+        debug!("total refunded: {:?}", refunded);
+        debug!("execution gas cost: {:?}", gas_cost);
+        gas_cost
     }
 }
