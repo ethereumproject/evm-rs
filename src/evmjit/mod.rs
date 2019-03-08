@@ -136,6 +136,8 @@ pub struct LLVMAttributeFactory {
     attr_nocapture: Attribute,
     attr_noalias: Attribute,
     attr_readnone: Attribute,
+    attr_noreturn: Attribute,
+    attr_speculatable: Attribute,
 }
 
 unsafe impl Sync for LLVMAttributeFactory {}
@@ -148,12 +150,16 @@ impl SingletonInit for LLVMAttributeFactory {
         let attr_nocapture_id = Attribute::get_named_enum_kind_id("nocapture");
         let attr_noalias_id = Attribute::get_named_enum_kind_id("noalias");
         let attr_readnone_id = Attribute::get_named_enum_kind_id("readnone");
+        let attr_noreturn_id = Attribute::get_named_enum_kind_id("noreturn");
+        let attr_speculatable_id = Attribute::get_named_enum_kind_id("speculatable");
 
         LLVMAttributeFactory {
             attr_nounwind: context.create_enum_attribute(attr_nounwind_id, 0),
             attr_nocapture: context.create_enum_attribute(attr_nocapture_id, 0),
             attr_noalias: context.create_enum_attribute(attr_noalias_id, 0),
-            attr_readnone: context.create_enum_attribute(attr_readnone_id, 0)
+            attr_readnone: context.create_enum_attribute(attr_readnone_id, 0),
+            attr_noreturn: context.create_enum_attribute(attr_noreturn_id, 0),
+            attr_speculatable: context.create_enum_attribute(attr_speculatable_id, 0),
         }
     }
 }
@@ -174,6 +180,15 @@ impl LLVMAttributeFactory {
     pub fn attr_readnone(&self) -> &Attribute {
         &self.attr_readnone
     }
+
+    pub fn attr_noreturn(&self) -> &Attribute {
+        &self.attr_noreturn
+    }
+
+    pub fn attr_speculatable(&self) -> &Attribute {
+        &self.attr_speculatable
+    }
+
 }
 
 
@@ -188,6 +203,8 @@ fn test_llvm_attribute_factory() {
     let nounwind = attr_factory.attr_nounwind();
     let noalias = attr_factory.attr_noalias();
     let readnone = attr_factory.attr_readnone();
+    let noreturn = attr_factory.attr_noreturn();
+    let speculatable = attr_factory.attr_speculatable();
 
     assert!(nocapture.is_enum());
     assert_eq!(nocapture.get_enum_value(), 0);
@@ -204,4 +221,13 @@ fn test_llvm_attribute_factory() {
     assert!(readnone.is_enum());
     assert_eq!(readnone.get_enum_value(), 0);
     assert_ne!(readnone.get_enum_kind_id(), 0);
+
+    assert!(noreturn.is_enum());
+    assert_eq!(noreturn.get_enum_value(), 0);
+    assert_ne!(noreturn.get_enum_kind_id(), 0);
+
+    assert!(speculatable.is_enum());
+    assert_eq!(speculatable.get_enum_value(), 0);
+    assert_ne!(speculatable.get_enum_kind_id(), 0);
+
 }
