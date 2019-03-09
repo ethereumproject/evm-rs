@@ -7,6 +7,7 @@ use singletonum::Singleton;
 use evmjit::compiler::evmtypes::EvmTypes;
 use inkwell::module::Linkage::*;
 use inkwell::AddressSpace;
+    use inkwell::types::IntType;
 
 static FRAME_ADDRESS_INTRINSIC_NAME: &str = "llvm.frameaddress";
 static SETJMP_INTRINSIC_NAME: &str = "llvm.eh.sjlj.setjmp";
@@ -87,10 +88,16 @@ impl LLVMIntrinsicManager for LLVMIntrinsic {
                                  arg_type: Option<BasicTypeEnum>) -> FunctionValue {
         match self {
             LLVMIntrinsic::Bswap => {
-                let types_instance = EvmTypes::get_instance(context);
-                let bswap_ret_type = types_instance.get_word_type();
-                let arg1 = types_instance.get_word_type();
-                let bswap_func_type = bswap_ret_type.fn_type(&[arg1.into()], false);
+                assert!(arg_type != None);
+                assert!(arg_type.unwrap().is_int_type());
+                let int_bit_width = arg_type.unwrap().into_int_type().get_bit_width();
+
+                let bswap_ret_type = context.custom_width_int_type(int_bit_width);
+
+                let width_t = IntType::custom_width_int_type(int_bit_width);
+                let type_enum = BasicTypeEnum::IntType(width_t);
+
+                let bswap_func_type = bswap_ret_type.fn_type(&[type_enum.into()], false);
                 let bswap_func = module.add_function(self.to_name(arg_type), 
                                                           bswap_func_type, 
                                                           Some(External));
@@ -179,3 +186,226 @@ impl LLVMIntrinsicManager for LLVMIntrinsic {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use inkwell::types::IntType;
+    use inkwell::attributes::Attribute;
+
+    #[test]
+    fn test_intrinsic_to_name() {
+        //let context = Context::create();
+
+        let i256_t = IntType::custom_width_int_type(256);
+        let i160_t = IntType::custom_width_int_type(160);
+        let type_enum_i256_t = BasicTypeEnum::IntType(i256_t);
+        let type_enum_i160_t = BasicTypeEnum::IntType(i160_t);
+
+        assert_eq!(LLVMIntrinsic::FrameAddress.to_name(None), "llvm.frameaddress");
+        assert_eq!(LLVMIntrinsic::LongJmp.to_name(None), "llvm.eh.sjlj.longjmp");
+        assert_eq!(LLVMIntrinsic::StackSave.to_name(None), "llvm.stacksave");
+        assert_eq!(LLVMIntrinsic::SetJmp.to_name(None), "llvm.eh.sjlj.setjmp");
+        assert_eq!(LLVMIntrinsic::Bswap.to_name(Some(type_enum_i256_t)), "llvm.bswap.i256");
+        assert_eq!(LLVMIntrinsic::Bswap.to_name(Some(type_enum_i160_t)), "llvm.bswap.i160");
+        assert_eq!(LLVMIntrinsic::Ctlz.to_name(Some(type_enum_i256_t)), "llvm.ctlz.i256");
+    }
+
+    #[test]
+    fn test_intrinsic_bswap256_decl() {
+        let context = Context::create();
+        let module = context.create_module("evm_module");
+        let types_instance = EvmTypes::get_instance(&context);
+        let word_type = types_instance.get_word_type();
+        let enum_word_type = BasicTypeEnum::IntType(word_type);
+        let func_decl = LLVMIntrinsic::Bswap.get_intrinsic_declaration(&context,
+                                                                       &module,
+                                                                       Some(enum_word_type));
+        assert_eq!(func_decl.count_params(), 1);
+        let func_name = func_decl.get_name();
+        assert_eq!(func_name.to_str(), Ok(LLVMIntrinsic::Bswap.to_name(Some(enum_word_type))));
+
+        let arg1 = func_decl.get_first_param().unwrap();
+        assert!(arg1.get_type().is_int_type());
+        assert_eq!(arg1.get_type().into_int_type().get_bit_width(), 256);
+
+        let ret_t = word_type;
+        assert_eq!(func_decl.get_return_type(), BasicTypeEnum::IntType(ret_t));
+        assert!(func_decl.get_linkage() == External);
+
+        let nounwind_attr = func_decl.get_enum_attribute(0, Attribute::get_named_enum_kind_id("nounwind"));
+        assert!(nounwind_attr != None);
+
+        let readnone_attr = func_decl.get_enum_attribute(0, Attribute::get_named_enum_kind_id("readnone"));
+        assert!(readnone_attr != None);
+
+        let speculatable_attr = func_decl.get_enum_attribute(0, Attribute::get_named_enum_kind_id("speculatable"));
+        assert!(speculatable_attr != None);
+    }
+
+    #[test]
+    fn test_intrinsic_bswap160_decl() {
+        let context = Context::create();
+        let module = context.create_module("evm_module");
+        let types_instance = EvmTypes::get_instance(&context);
+        let addr_type = types_instance.get_address_type();
+        let enum_addr_type = BasicTypeEnum::IntType(addr_type);
+        let func_decl = LLVMIntrinsic::Bswap.get_intrinsic_declaration(&context,
+                                                                       &module,
+                                                                       Some(enum_addr_type));
+        assert_eq!(func_decl.count_params(), 1);
+        let func_name = func_decl.get_name();
+        assert_eq!(func_name.to_str(), Ok(LLVMIntrinsic::Bswap.to_name(Some(enum_addr_type))));
+
+        let arg1 = func_decl.get_first_param().unwrap();
+        assert!(arg1.get_type().is_int_type());
+        assert_eq!(arg1.get_type().into_int_type().get_bit_width(), 160);
+
+        let ret_t = addr_type;
+        assert_eq!(func_decl.get_return_type(), BasicTypeEnum::IntType(ret_t));
+        assert!(func_decl.get_linkage() == External);
+
+        let nounwind_attr = func_decl.get_enum_attribute(0, Attribute::get_named_enum_kind_id("nounwind"));
+        assert!(nounwind_attr != None);
+
+        let readnone_attr = func_decl.get_enum_attribute(0, Attribute::get_named_enum_kind_id("readnone"));
+        assert!(readnone_attr != None);
+
+        let speculatable_attr = func_decl.get_enum_attribute(0, Attribute::get_named_enum_kind_id("speculatable"));
+        assert!(speculatable_attr != None);
+    }
+
+    #[test]
+    fn test_intrinsic_ctlz256_decl() {
+        let context = Context::create();
+        let module = context.create_module("evm_module");
+        let types_instance = EvmTypes::get_instance(&context);
+        let word_type = types_instance.get_word_type();
+        let enum_word_type = BasicTypeEnum::IntType(word_type);
+        let func_decl = LLVMIntrinsic::Ctlz.get_intrinsic_declaration(&context,
+                                                                       &module,
+                                                                       Some(enum_word_type));
+        assert_eq!(func_decl.count_params(), 2);
+        let func_name = func_decl.get_name();
+        assert_eq!(func_name.to_str(), Ok(LLVMIntrinsic::Ctlz.to_name(Some(enum_word_type))));
+
+        let arg1 = func_decl.get_nth_param(0).unwrap();
+        assert!(arg1.get_type().is_int_type());
+        assert_eq!(arg1.get_type().into_int_type().get_bit_width(), 256);
+
+        let arg2 = func_decl.get_nth_param(1).unwrap();
+        assert!(arg2.get_type().is_int_type());
+        assert_eq!(arg2.get_type().into_int_type().get_bit_width(), 1);
+
+        let ret_t = word_type;
+        assert_eq!(func_decl.get_return_type(), BasicTypeEnum::IntType(ret_t));
+        assert!(func_decl.get_linkage() == External);
+
+        let nounwind_attr = func_decl.get_enum_attribute(0, Attribute::get_named_enum_kind_id("nounwind"));
+        assert!(nounwind_attr != None);
+
+        let readnone_attr = func_decl.get_enum_attribute(0, Attribute::get_named_enum_kind_id("readnone"));
+        assert!(readnone_attr != None);
+
+        let speculatable_attr = func_decl.get_enum_attribute(0, Attribute::get_named_enum_kind_id("speculatable"));
+        assert!(speculatable_attr != None);
+    }
+
+    #[test]
+    fn test_intrinsic_stacksave_decl() {
+        let context = Context::create();
+        let module = context.create_module("evm_module");
+
+        let func_decl = LLVMIntrinsic::StackSave.get_intrinsic_declaration(&context,
+                                                                      &module,
+                                                                      None);
+        assert_eq!(func_decl.count_params(), 0);
+        let func_name = func_decl.get_name();
+        assert_eq!(func_name.to_str(), Ok(LLVMIntrinsic::StackSave.to_name(None)));
+
+        let ret_t = context.i8_type().ptr_type(AddressSpace::Generic);
+        assert_eq!(func_decl.get_return_type(), BasicTypeEnum::PointerType(ret_t));
+        assert!(func_decl.get_linkage() == External);
+        let nounwind_attr = func_decl.get_enum_attribute(0, Attribute::get_named_enum_kind_id("nounwind"));
+        assert!(nounwind_attr != None);
+    }
+
+    #[test]
+    fn test_intrinsic_frameaddress_decl() {
+        let context = Context::create();
+        let module = context.create_module("evm_module");
+
+        let func_decl = LLVMIntrinsic::FrameAddress.get_intrinsic_declaration(&context,
+                                                                              &module,
+                                                                              None);
+        assert_eq!(func_decl.count_params(), 1);
+        let arg1 = func_decl.get_first_param().unwrap();
+        assert!(arg1.get_type().is_int_type());
+        assert_eq!(arg1.get_type().into_int_type().get_bit_width(), 32);
+
+        let func_name = func_decl.get_name();
+        assert_eq!(func_name.to_str(), Ok(LLVMIntrinsic::FrameAddress.to_name(None)));
+
+        let ret_t = context.i8_type().ptr_type(AddressSpace::Generic);
+        assert_eq!(func_decl.get_return_type(), BasicTypeEnum::PointerType(ret_t));
+        assert!(func_decl.get_linkage() == External);
+        let nounwind_attr = func_decl.get_enum_attribute(0, Attribute::get_named_enum_kind_id("nounwind"));
+        assert!(nounwind_attr != None);
+
+        let readnone_attr = func_decl.get_enum_attribute(0, Attribute::get_named_enum_kind_id("readnone"));
+        assert!(readnone_attr != None);
+    }
+
+    #[test]
+    fn test_intrinsic_setjmp_decl() {
+        let context = Context::create();
+        let module = context.create_module("evm_module");
+
+        let func_decl = LLVMIntrinsic::SetJmp.get_intrinsic_declaration(&context,
+                                                                              &module,
+                                                                              None);
+        assert_eq!(func_decl.count_params(), 1);
+        let arg1 = func_decl.get_first_param().unwrap();
+        assert!(arg1.get_type().is_pointer_type());
+        let ptr_elt_t = arg1.into_pointer_value().get_type().get_element_type();
+
+        assert!(ptr_elt_t.is_int_type());
+        assert_eq!(ptr_elt_t.as_int_type().get_bit_width(), 8);
+
+        let func_name = func_decl.get_name();
+        assert_eq!(func_name.to_str(), Ok(LLVMIntrinsic::SetJmp.to_name(None)));
+
+        let ret_t = context.i32_type();
+        assert_eq!(func_decl.get_return_type(), BasicTypeEnum::IntType(ret_t));
+        assert!(func_decl.get_linkage() == External);
+        let nounwind_attr = func_decl.get_enum_attribute(0, Attribute::get_named_enum_kind_id("nounwind"));
+        assert!(nounwind_attr != None);
+    }
+
+    #[test]
+    fn test_intrinsic_longjmp_decl() {
+        let context = Context::create();
+        let module = context.create_module("evm_module");
+
+        let func_decl = LLVMIntrinsic::LongJmp.get_intrinsic_declaration(&context,
+                                                                              &module,
+                                                                              None);
+        assert_eq!(func_decl.count_params(), 1);
+        let arg1 = func_decl.get_first_param().unwrap();
+        assert!(arg1.get_type().is_pointer_type());
+        let ptr_elt_t = arg1.into_pointer_value().get_type().get_element_type();
+
+        assert!(ptr_elt_t.is_int_type());
+        assert_eq!(ptr_elt_t.as_int_type().get_bit_width(), 8);
+
+        let func_name = func_decl.get_name();
+        assert_eq!(func_name.to_str(), Ok(LLVMIntrinsic::LongJmp.to_name(None)));
+
+        assert!(func_decl.get_linkage() == External);
+        let nounwind_attr = func_decl.get_enum_attribute(0, Attribute::get_named_enum_kind_id("nounwind"));
+        assert!(nounwind_attr != None);
+
+        let noreturn_attr = func_decl.get_enum_attribute(0, Attribute::get_named_enum_kind_id("noreturn"));
+        assert!(noreturn_attr != None);
+    }
+
+}
