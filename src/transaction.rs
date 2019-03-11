@@ -234,10 +234,10 @@ impl ValidTransaction {
         let upfront: U256 = upfront.into();
         let new_gas_limit = gas_limit.saturating_sub(upfront);
         trace!("gas_limit({}) - upfront({}) = {}", gas_limit, upfront, new_gas_limit);
-        let gas_limit = Gas::from(gas_limit);
+        let new_gas_limit = Gas::from(new_gas_limit);
 
         // print a warning if gas limit have zeroed out
-        if gas_limit == Gas::zero() {
+        if new_gas_limit == Gas::zero() {
             warn!("gas limit saturated to zero");
         }
 
@@ -259,7 +259,7 @@ impl ValidTransaction {
                     data: self.input,
                     gas_price: self.gas_price,
                     value: self.value,
-                    gas_limit,
+                    gas_limit: new_gas_limit,
                     code: account_state.code(address).unwrap(),
                     origin: origin.unwrap_or(self.caller.unwrap_or(system_address!())),
                     apprent_value: self.value,
@@ -279,7 +279,7 @@ impl ValidTransaction {
                     caller: self.caller.unwrap_or(system_address!()),
                     gas_price: self.gas_price,
                     value: self.value,
-                    gas_limit,
+                    gas_limit: new_gas_limit,
                     data: Rc::new(Vec::new()),
                     code: self.input,
                     origin: origin.unwrap_or(self.caller.unwrap_or(system_address!())),
