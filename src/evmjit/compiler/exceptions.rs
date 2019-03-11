@@ -31,22 +31,28 @@ impl ExceptionManager {
         let i32_zero = context.i32_type().const_int(0, false);
 
         // Save frame pointer
-        builder.build_call (frame_addr_decl, &[i32_zero.into()], "fp");
+        let fp = builder.build_call (frame_addr_decl, &[i32_zero.into()], "fp");
+        let fp_result_as_basic_val = fp.try_as_basic_value().left().unwrap();
+        builder.build_store(setjmp_words, fp_result_as_basic_val);
 
         let stack_save_decl = LLVMIntrinsic::StackSave.get_intrinsic_declaration(&context,
                                                                                  &module,
                                                                                  None);
 
         // Save stack pointer
-        builder.build_call (stack_save_decl, &[], "sp");
+        let sp = builder.build_call (stack_save_decl, &[], "sp");
+        let sp_result_as_basic_val = sp.try_as_basic_value().left().unwrap();
 
-        let setjmp_decl = LLVMIntrinsic::SetJmp.get_intrinsic_declaration(&context,
-                                                                          &module,
-                                                                          None);
-        
-        let i64_two = context.i64_type().const_int(2, false);
+
         unsafe {
-            builder.build_in_bounds_gep(setjmp_words, &[i64_two.into()], "jmpBuf.sp");
+            let i64_two = context.i64_type().const_int(2, false);
+            let jmp_buf_sp = builder.build_in_bounds_gep(setjmp_words, &[i64_two.into()], "jmpBuf.sp");
+            builder.build_store(jmp_buf_sp, sp_result_as_basic_val);
+
+            let setjmp_decl = LLVMIntrinsic::SetJmp.get_intrinsic_declaration(&context,
+                                                                              &module,
+                                                                              None);
+        
             let jmp_buf = builder.build_pointer_cast(setjmp_words, byte_ptr_t, "jmpBuf");
             let setjmp_result = builder.build_call(setjmp_decl, &[jmp_buf.into()], "");
             let setjmp_result_as_int_val = setjmp_result.try_as_basic_value().left().unwrap().into_int_value();
