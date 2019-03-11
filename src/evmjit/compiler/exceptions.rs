@@ -72,3 +72,21 @@ impl ExceptionManager {
         self.exception_dest
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::ffi::CString;
+    use super::*;
+    use inkwell::values::InstructionOpcode;
+
+    #[test]
+    fn test_exception_manager() {
+        let context = Context::create();
+        let module = context.create_module("my_module");
+        let builder = context.create_builder();
+
+        // Generate outline of main function needed by 'RuntimeTypeManager
+        MainFuncCreator::new ("main", &context, &builder, &module);
+
+    }
+}
