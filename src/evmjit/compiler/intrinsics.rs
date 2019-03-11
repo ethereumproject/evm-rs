@@ -7,7 +7,7 @@ use singletonum::Singleton;
 use evmjit::compiler::evmtypes::EvmTypes;
 use inkwell::module::Linkage::*;
 use inkwell::AddressSpace;
-    use inkwell::types::IntType;
+use inkwell::types::IntType;
 
 static FRAME_ADDRESS_INTRINSIC_NAME: &str = "llvm.frameaddress";
 static SETJMP_INTRINSIC_NAME: &str = "llvm.eh.sjlj.setjmp";
