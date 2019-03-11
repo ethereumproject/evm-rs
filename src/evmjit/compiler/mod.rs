@@ -4,3 +4,4 @@ pub mod evmconstants;
 pub mod memory;
 pub mod stack;
 pub mod intrinsics;
+pub mod exceptions;
