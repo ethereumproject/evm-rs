@@ -264,6 +264,7 @@ mod tests {
     use super::*;
     use inkwell::values::InstructionOpcode;
     use inkwell::values::BasicValue;
+    use evmjit::compiler::evm_compiler::MainFuncCreator;
     
     #[test]
     fn test_tx_ctx_type() {
@@ -276,7 +277,6 @@ mod tests {
 
     #[test]
     fn test_load_txctx_fn_instructions() {
-        use super::super::MainFuncCreator;
         let context = Context::create();
         let module = context.create_module("evm_module");
         let builder = context.create_builder();
@@ -419,7 +419,6 @@ mod tests {
 
     #[test]
     fn test_transaction_context_manager() {
-        use super::super::MainFuncCreator;
         let context = Context::create();
         let module = context.create_module("my_module");
         let builder = context.create_builder();
@@ -486,7 +485,6 @@ mod tests {
 
     #[test]
     fn test_get_tx_ctx_type() {
-        use super::super::MainFuncCreator;
         let context = Context::create();
         let module = context.create_module("my_module");
         let builder = context.create_builder();

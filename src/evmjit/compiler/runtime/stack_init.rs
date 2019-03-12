@@ -64,7 +64,6 @@ mod tests {
 
     #[test]
     fn test_stack_allocator_new() {
-        //use super::super::MainFuncCreator;
         let context = Context::create();
         let module = context.create_module("my_module");
         let builder = context.create_builder();

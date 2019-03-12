@@ -78,6 +78,7 @@ mod tests {
     use std::ffi::CString;
     use super::*;
     use inkwell::values::InstructionOpcode;
+    use evmjit::compiler::evm_compiler::MainFuncCreator;
 
     #[test]
     fn test_exception_manager() {

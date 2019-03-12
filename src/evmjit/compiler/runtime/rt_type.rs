@@ -280,6 +280,7 @@ impl<'a> RuntimeTypeManager<'a> {
 mod tests {
     use super::*;
     use inkwell::values::InstructionOpcode;
+    use evmjit::compiler::evm_compiler::MainFuncCreator;
 
     #[test]
     fn test_runtime_type() {
@@ -298,7 +299,6 @@ mod tests {
 
     #[test]
     fn test_get_env_ptr() {
-        use super::super::MainFuncCreator;
         let context = Context::create();
         let module = context.create_module("my_module");
         let builder = context.create_builder();
@@ -314,7 +314,6 @@ mod tests {
 
     #[test]
     fn test_get_data_ptr() {
-        use super::super::MainFuncCreator;
         let context = Context::create();
         let module = context.create_module("my_module");
         let builder = context.create_builder();
@@ -330,7 +329,6 @@ mod tests {
 
     #[test]
     fn test_get_mem_ptr() {
-        use super::super::MainFuncCreator;
         let context = Context::create();
         let module = context.create_module("my_module");
         let builder = context.create_builder();
@@ -346,7 +344,6 @@ mod tests {
 
     #[test]
     fn test_get_runtime_manager_new() {
-        use super::super::MainFuncCreator;
         let context = Context::create();
         let module = context.create_module("my_module");
         let builder = context.create_builder();
