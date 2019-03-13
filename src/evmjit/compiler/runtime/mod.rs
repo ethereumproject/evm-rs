@@ -292,6 +292,7 @@ mod tests {
     use self::txctx::TransactionContextType;
     use self::env::EnvDataType;
     use evmjit::compiler::evm_compiler::MainFuncCreator;
+    use evmjit::GetOperandValue;
 
     #[test]
     fn test_data_field_to_index() {
@@ -315,8 +316,6 @@ mod tests {
 
         //let manager = RuntimeManager::new("main", &context, &builder, &module);
         let manager = RuntimeManager::new(&context, &builder, &module);
-
-        module.print_to_stderr();
 
         assert!(RuntimeDataType::is_rt_data_type(&manager.get_runtime_data_type()));
         assert!(RuntimeType::is_runtime_type(&manager.get_runtime_type()));
@@ -359,11 +358,11 @@ mod tests {
         assert_eq!(second_insn.get_opcode(), InstructionOpcode::Store);
         assert_eq!(second_insn.get_num_operands(), 2);
 
-        let store_operand0 = second_insn.get_operand(0).unwrap();
+        let store_operand0 = second_insn.get_operand_value(0).unwrap();
         assert!(store_operand0.is_int_value());
         assert_eq!(store_operand0.get_type().as_int_type().get_bit_width(), 64);
 
-        let store_operand1 = second_insn.get_operand(1).unwrap();
+        let store_operand1 = second_insn.get_operand_value(1).unwrap();
         assert!(store_operand1.is_pointer_value());
         let store_operand1_ptr_elt_t = store_operand1.into_pointer_value().get_type().get_element_type();
 
@@ -408,7 +407,7 @@ mod tests {
         let third_insn = second_insn.get_next_instruction().unwrap();
         assert_eq!(third_insn.get_opcode(), InstructionOpcode::Store);
 
-        let store_operand0 = third_insn.get_operand(0).unwrap();
+        let store_operand0 = third_insn.get_operand_value(0).unwrap();
         assert!(store_operand0.is_int_value());
         let store_operand0_value = store_operand0.into_int_value();
         assert_eq!(store_operand0_value, context.i64_type().const_int(0, false));
@@ -445,14 +444,14 @@ mod tests {
         assert_eq!(first_insn.get_opcode(), InstructionOpcode::Call);
         assert_eq!(first_insn.get_num_operands(), 4);
 
-        let call_operand0 = first_insn.get_operand(0).unwrap();
+        let call_operand0 = first_insn.get_operand_value(0).unwrap();
 
         assert!(call_operand0.is_pointer_value());   // should be i1 *
         let call_operand0_ptr_elt_t = call_operand0.into_pointer_value().get_type().get_element_type();
         assert!(call_operand0_ptr_elt_t.is_int_type());
         assert!(call_operand0_ptr_elt_t.into_int_type().get_bit_width() == 1);
 
-        let call_operand1 = first_insn.get_operand(1).unwrap();
+        let call_operand1 = first_insn.get_operand_value(1).unwrap();
 
         assert!(call_operand1.is_pointer_value());   // should be evm.txctx *
 
@@ -460,7 +459,7 @@ mod tests {
         assert!(call_operand1_ptr_elt_t.is_struct_type());
         assert!(TransactionContextType::is_transaction_context_type(&call_operand1_ptr_elt_t.as_struct_type()));
 
-        let call_operand2 = first_insn.get_operand(2).unwrap();
+        let call_operand2 = first_insn.get_operand_value(2).unwrap();
         assert!(call_operand2.is_pointer_value());   // should be Env *
 
         let call_operand2_ptr_elt_t = call_operand2.into_pointer_value().get_type().get_element_type();
@@ -474,18 +473,18 @@ mod tests {
 
         assert_eq!(second_insn.get_num_operands(), 3);
 
-        let gep_operand0 = second_insn.get_operand(0).unwrap();
+        let gep_operand0 = second_insn.get_operand_value(0).unwrap();
         assert!(gep_operand0.is_pointer_value());
         let gep_operand0_ptr_elt_t = gep_operand0.into_pointer_value().get_type().get_element_type();
         assert!(gep_operand0_ptr_elt_t.is_struct_type());
         let gep_operand0_type = gep_operand0_ptr_elt_t.into_struct_type();
         assert!(TransactionContextType::is_transaction_context_type(&gep_operand0_type));
 
-        let gep_operand1 = second_insn.get_operand(1).unwrap();
+        let gep_operand1 = second_insn.get_operand_value(1).unwrap();
         assert!(gep_operand1.is_int_value());
         assert_eq!(gep_operand1.into_int_value(), context.i32_type().const_int(0, false));
 
-        let gep_operand2 = second_insn.get_operand(2).unwrap();
+        let gep_operand2 = second_insn.get_operand_value(2).unwrap();
         assert!(gep_operand2.is_int_value());
         assert_eq!(gep_operand2.into_int_value(), context.i32_type().const_int(0, false));
 
@@ -493,7 +492,7 @@ mod tests {
         let third_insn = second_insn.get_next_instruction().unwrap();
         assert_eq!(third_insn.get_opcode(), InstructionOpcode::Load);
 
-        let load_operand0 = third_insn.get_operand(0).unwrap();
+        let load_operand0 = third_insn.get_operand_value(0).unwrap();
         assert!(load_operand0.is_pointer_value());
 
         let load_operand0_ptr_elt_t = load_operand0.into_pointer_value().get_type().get_element_type();
@@ -529,14 +528,14 @@ mod tests {
         assert_eq!(first_insn.get_opcode(), InstructionOpcode::Call);
         assert_eq!(first_insn.get_num_operands(), 4);
 
-        let call_operand0 = first_insn.get_operand(0).unwrap();
+        let call_operand0 = first_insn.get_operand_value(0).unwrap();
 
         assert!(call_operand0.is_pointer_value());   // should be i1 *
         let call_operand0_ptr_elt_t = call_operand0.into_pointer_value().get_type().get_element_type();
         assert!(call_operand0_ptr_elt_t.is_int_type());
         assert!(call_operand0_ptr_elt_t.into_int_type().get_bit_width() == 1);
 
-        let call_operand1 = first_insn.get_operand(1).unwrap();
+        let call_operand1 = first_insn.get_operand_value(1).unwrap();
 
         assert!(call_operand1.is_pointer_value());   // should be evm.txctx *
 
@@ -544,7 +543,7 @@ mod tests {
         assert!(call_operand1_ptr_elt_t.is_struct_type());
         assert!(TransactionContextType::is_transaction_context_type(&call_operand1_ptr_elt_t.as_struct_type()));
 
-        let call_operand2 = first_insn.get_operand(2).unwrap();
+        let call_operand2 = first_insn.get_operand_value(2).unwrap();
         assert!(call_operand2.is_pointer_value());   // should be Env *
 
         let call_operand2_ptr_elt_t = call_operand2.into_pointer_value().get_type().get_element_type();
@@ -558,18 +557,18 @@ mod tests {
 
         assert_eq!(second_insn.get_num_operands(), 3);
 
-        let gep_operand0 = second_insn.get_operand(0).unwrap();
+        let gep_operand0 = second_insn.get_operand_value(0).unwrap();
         assert!(gep_operand0.is_pointer_value());
         let gep_operand0_ptr_elt_t = gep_operand0.into_pointer_value().get_type().get_element_type();
         assert!(gep_operand0_ptr_elt_t.is_struct_type());
         let gep_operand0_type = gep_operand0_ptr_elt_t.into_struct_type();
         assert!(TransactionContextType::is_transaction_context_type(&gep_operand0_type));
 
-        let gep_operand1 = second_insn.get_operand(1).unwrap();
+        let gep_operand1 = second_insn.get_operand_value(1).unwrap();
         assert!(gep_operand1.is_int_value());
         assert_eq!(gep_operand1.into_int_value(), context.i32_type().const_int(0, false));
 
-        let gep_operand2 = second_insn.get_operand(2).unwrap();
+        let gep_operand2 = second_insn.get_operand_value(2).unwrap();
         assert!(gep_operand2.is_int_value());
         assert_eq!(gep_operand2.into_int_value(), context.i32_type().const_int(1, false));
 
@@ -581,7 +580,7 @@ mod tests {
         let fourth_insn = third_insn.get_next_instruction().unwrap();
         assert_eq!(fourth_insn.get_opcode(), InstructionOpcode::Load);
 
-        let load_operand0 = fourth_insn.get_operand(0).unwrap();
+        let load_operand0 = fourth_insn.get_operand_value(0).unwrap();
         assert!(load_operand0.is_pointer_value());
 
         let load_operand0_ptr_elt_t = load_operand0.into_pointer_value().get_type().get_element_type();
@@ -618,14 +617,14 @@ mod tests {
         assert_eq!(first_insn.get_opcode(), InstructionOpcode::Call);
         assert_eq!(first_insn.get_num_operands(), 4);
 
-        let call_operand0 = first_insn.get_operand(0).unwrap();
+        let call_operand0 = first_insn.get_operand_value(0).unwrap();
 
         assert!(call_operand0.is_pointer_value());   // should be i1 *
         let call_operand0_ptr_elt_t = call_operand0.into_pointer_value().get_type().get_element_type();
         assert!(call_operand0_ptr_elt_t.is_int_type());
         assert!(call_operand0_ptr_elt_t.into_int_type().get_bit_width() == 1);
 
-        let call_operand1 = first_insn.get_operand(1).unwrap();
+        let call_operand1 = first_insn.get_operand_value(1).unwrap();
 
         assert!(call_operand1.is_pointer_value());   // should be evm.txctx *
 
@@ -633,7 +632,7 @@ mod tests {
         assert!(call_operand1_ptr_elt_t.is_struct_type());
         assert!(TransactionContextType::is_transaction_context_type(&call_operand1_ptr_elt_t.as_struct_type()));
 
-        let call_operand2 = first_insn.get_operand(2).unwrap();
+        let call_operand2 = first_insn.get_operand_value(2).unwrap();
         assert!(call_operand2.is_pointer_value());   // should be Env *
 
         let call_operand2_ptr_elt_t = call_operand2.into_pointer_value().get_type().get_element_type();
@@ -647,18 +646,18 @@ mod tests {
 
         assert_eq!(second_insn.get_num_operands(), 3);
 
-        let gep_operand0 = second_insn.get_operand(0).unwrap();
+        let gep_operand0 = second_insn.get_operand_value(0).unwrap();
         assert!(gep_operand0.is_pointer_value());
         let gep_operand0_ptr_elt_t = gep_operand0.into_pointer_value().get_type().get_element_type();
         assert!(gep_operand0_ptr_elt_t.is_struct_type());
         let gep_operand0_type = gep_operand0_ptr_elt_t.into_struct_type();
         assert!(TransactionContextType::is_transaction_context_type(&gep_operand0_type));
 
-        let gep_operand1 = second_insn.get_operand(1).unwrap();
+        let gep_operand1 = second_insn.get_operand_value(1).unwrap();
         assert!(gep_operand1.is_int_value());
         assert_eq!(gep_operand1.into_int_value(), context.i32_type().const_int(0, false));
 
-        let gep_operand2 = second_insn.get_operand(2).unwrap();
+        let gep_operand2 = second_insn.get_operand_value(2).unwrap();
         assert!(gep_operand2.is_int_value());
         assert_eq!(gep_operand2.into_int_value(), context.i32_type().const_int(2, false));
 
@@ -670,7 +669,7 @@ mod tests {
         let fourth_insn = third_insn.get_next_instruction().unwrap();
         assert_eq!(fourth_insn.get_opcode(), InstructionOpcode::Load);
 
-        let load_operand0 = fourth_insn.get_operand(0).unwrap();
+        let load_operand0 = fourth_insn.get_operand_value(0).unwrap();
         assert!(load_operand0.is_pointer_value());
 
         let load_operand0_ptr_elt_t = load_operand0.into_pointer_value().get_type().get_element_type();
@@ -707,14 +706,14 @@ mod tests {
         assert_eq!(first_insn.get_opcode(), InstructionOpcode::Call);
         assert_eq!(first_insn.get_num_operands(), 4);
 
-        let call_operand0 = first_insn.get_operand(0).unwrap();
+        let call_operand0 = first_insn.get_operand_value(0).unwrap();
 
         assert!(call_operand0.is_pointer_value());   // should be i1 *
         let call_operand0_ptr_elt_t = call_operand0.into_pointer_value().get_type().get_element_type();
         assert!(call_operand0_ptr_elt_t.is_int_type());
         assert!(call_operand0_ptr_elt_t.into_int_type().get_bit_width() == 1);
 
-        let call_operand1 = first_insn.get_operand(1).unwrap();
+        let call_operand1 = first_insn.get_operand_value(1).unwrap();
 
         assert!(call_operand1.is_pointer_value());   // should be evm.txctx *
 
@@ -722,7 +721,7 @@ mod tests {
         assert!(call_operand1_ptr_elt_t.is_struct_type());
         assert!(TransactionContextType::is_transaction_context_type(&call_operand1_ptr_elt_t.as_struct_type()));
 
-        let call_operand2 = first_insn.get_operand(2).unwrap();
+        let call_operand2 = first_insn.get_operand_value(2).unwrap();
         assert!(call_operand2.is_pointer_value());   // should be Env *
 
         let call_operand2_ptr_elt_t = call_operand2.into_pointer_value().get_type().get_element_type();
@@ -736,18 +735,18 @@ mod tests {
 
         assert_eq!(second_insn.get_num_operands(), 3);
 
-        let gep_operand0 = second_insn.get_operand(0).unwrap();
+        let gep_operand0 = second_insn.get_operand_value(0).unwrap();
         assert!(gep_operand0.is_pointer_value());
         let gep_operand0_ptr_elt_t = gep_operand0.into_pointer_value().get_type().get_element_type();
         assert!(gep_operand0_ptr_elt_t.is_struct_type());
         let gep_operand0_type = gep_operand0_ptr_elt_t.into_struct_type();
         assert!(TransactionContextType::is_transaction_context_type(&gep_operand0_type));
 
-        let gep_operand1 = second_insn.get_operand(1).unwrap();
+        let gep_operand1 = second_insn.get_operand_value(1).unwrap();
         assert!(gep_operand1.is_int_value());
         assert_eq!(gep_operand1.into_int_value(), context.i32_type().const_int(0, false));
 
-        let gep_operand2 = second_insn.get_operand(2).unwrap();
+        let gep_operand2 = second_insn.get_operand_value(2).unwrap();
         assert!(gep_operand2.is_int_value());
         assert_eq!(gep_operand2.into_int_value(), context.i32_type().const_int(3, false));
 
@@ -755,7 +754,7 @@ mod tests {
         let third_insn = second_insn.get_next_instruction().unwrap();
         assert_eq!(third_insn.get_opcode(), InstructionOpcode::Load);
 
-        let load_operand0 = third_insn.get_operand(0).unwrap();
+        let load_operand0 = third_insn.get_operand_value(0).unwrap();
         assert!(load_operand0.is_pointer_value());
 
         let load_operand0_ptr_elt_t = load_operand0.into_pointer_value().get_type().get_element_type();
@@ -792,14 +791,14 @@ mod tests {
         assert_eq!(first_insn.get_opcode(), InstructionOpcode::Call);
         assert_eq!(first_insn.get_num_operands(), 4);
 
-        let call_operand0 = first_insn.get_operand(0).unwrap();
+        let call_operand0 = first_insn.get_operand_value(0).unwrap();
 
         assert!(call_operand0.is_pointer_value());   // should be i1 *
         let call_operand0_ptr_elt_t = call_operand0.into_pointer_value().get_type().get_element_type();
         assert!(call_operand0_ptr_elt_t.is_int_type());
         assert!(call_operand0_ptr_elt_t.into_int_type().get_bit_width() == 1);
 
-        let call_operand1 = first_insn.get_operand(1).unwrap();
+        let call_operand1 = first_insn.get_operand_value(1).unwrap();
 
         assert!(call_operand1.is_pointer_value());   // should be evm.txctx *
 
@@ -807,7 +806,7 @@ mod tests {
         assert!(call_operand1_ptr_elt_t.is_struct_type());
         assert!(TransactionContextType::is_transaction_context_type(&call_operand1_ptr_elt_t.as_struct_type()));
 
-        let call_operand2 = first_insn.get_operand(2).unwrap();
+        let call_operand2 = first_insn.get_operand_value(2).unwrap();
         assert!(call_operand2.is_pointer_value());   // should be Env *
 
         let call_operand2_ptr_elt_t = call_operand2.into_pointer_value().get_type().get_element_type();
@@ -821,18 +820,18 @@ mod tests {
 
         assert_eq!(second_insn.get_num_operands(), 3);
 
-        let gep_operand0 = second_insn.get_operand(0).unwrap();
+        let gep_operand0 = second_insn.get_operand_value(0).unwrap();
         assert!(gep_operand0.is_pointer_value());
         let gep_operand0_ptr_elt_t = gep_operand0.into_pointer_value().get_type().get_element_type();
         assert!(gep_operand0_ptr_elt_t.is_struct_type());
         let gep_operand0_type = gep_operand0_ptr_elt_t.into_struct_type();
         assert!(TransactionContextType::is_transaction_context_type(&gep_operand0_type));
 
-        let gep_operand1 = second_insn.get_operand(1).unwrap();
+        let gep_operand1 = second_insn.get_operand_value(1).unwrap();
         assert!(gep_operand1.is_int_value());
         assert_eq!(gep_operand1.into_int_value(), context.i32_type().const_int(0, false));
 
-        let gep_operand2 = second_insn.get_operand(2).unwrap();
+        let gep_operand2 = second_insn.get_operand_value(2).unwrap();
         assert!(gep_operand2.is_int_value());
         assert_eq!(gep_operand2.into_int_value(), context.i32_type().const_int(4, false));
 
@@ -840,7 +839,7 @@ mod tests {
         let third_insn = second_insn.get_next_instruction().unwrap();
         assert_eq!(third_insn.get_opcode(), InstructionOpcode::Load);
 
-        let load_operand0 = third_insn.get_operand(0).unwrap();
+        let load_operand0 = third_insn.get_operand_value(0).unwrap();
         assert!(load_operand0.is_pointer_value());
 
         let load_operand0_ptr_elt_t = load_operand0.into_pointer_value().get_type().get_element_type();
@@ -877,14 +876,14 @@ mod tests {
         assert_eq!(first_insn.get_opcode(), InstructionOpcode::Call);
         assert_eq!(first_insn.get_num_operands(), 4);
 
-        let call_operand0 = first_insn.get_operand(0).unwrap();
+        let call_operand0 = first_insn.get_operand_value(0).unwrap();
 
         assert!(call_operand0.is_pointer_value());   // should be i1 *
         let call_operand0_ptr_elt_t = call_operand0.into_pointer_value().get_type().get_element_type();
         assert!(call_operand0_ptr_elt_t.is_int_type());
         assert!(call_operand0_ptr_elt_t.into_int_type().get_bit_width() == 1);
 
-        let call_operand1 = first_insn.get_operand(1).unwrap();
+        let call_operand1 = first_insn.get_operand_value(1).unwrap();
 
         assert!(call_operand1.is_pointer_value());   // should be evm.txctx *
 
@@ -892,7 +891,7 @@ mod tests {
         assert!(call_operand1_ptr_elt_t.is_struct_type());
         assert!(TransactionContextType::is_transaction_context_type(&call_operand1_ptr_elt_t.as_struct_type()));
 
-        let call_operand2 = first_insn.get_operand(2).unwrap();
+        let call_operand2 = first_insn.get_operand_value(2).unwrap();
         assert!(call_operand2.is_pointer_value());   // should be Env *
 
         let call_operand2_ptr_elt_t = call_operand2.into_pointer_value().get_type().get_element_type();
@@ -906,18 +905,18 @@ mod tests {
 
         assert_eq!(second_insn.get_num_operands(), 3);
 
-        let gep_operand0 = second_insn.get_operand(0).unwrap();
+        let gep_operand0 = second_insn.get_operand_value(0).unwrap();
         assert!(gep_operand0.is_pointer_value());
         let gep_operand0_ptr_elt_t = gep_operand0.into_pointer_value().get_type().get_element_type();
         assert!(gep_operand0_ptr_elt_t.is_struct_type());
         let gep_operand0_type = gep_operand0_ptr_elt_t.into_struct_type();
         assert!(TransactionContextType::is_transaction_context_type(&gep_operand0_type));
 
-        let gep_operand1 = second_insn.get_operand(1).unwrap();
+        let gep_operand1 = second_insn.get_operand_value(1).unwrap();
         assert!(gep_operand1.is_int_value());
         assert_eq!(gep_operand1.into_int_value(), context.i32_type().const_int(0, false));
 
-        let gep_operand2 = second_insn.get_operand(2).unwrap();
+        let gep_operand2 = second_insn.get_operand_value(2).unwrap();
         assert!(gep_operand2.is_int_value());
         assert_eq!(gep_operand2.into_int_value(), context.i32_type().const_int(5, false));
 
@@ -925,7 +924,7 @@ mod tests {
         let third_insn = second_insn.get_next_instruction().unwrap();
         assert_eq!(third_insn.get_opcode(), InstructionOpcode::Load);
 
-        let load_operand0 = third_insn.get_operand(0).unwrap();
+        let load_operand0 = third_insn.get_operand_value(0).unwrap();
         assert!(load_operand0.is_pointer_value());
 
         let load_operand0_ptr_elt_t = load_operand0.into_pointer_value().get_type().get_element_type();
@@ -962,14 +961,14 @@ mod tests {
         assert_eq!(first_insn.get_opcode(), InstructionOpcode::Call);
         assert_eq!(first_insn.get_num_operands(), 4);
 
-        let call_operand0 = first_insn.get_operand(0).unwrap();
+        let call_operand0 = first_insn.get_operand_value(0).unwrap();
 
         assert!(call_operand0.is_pointer_value());   // should be i1 *
         let call_operand0_ptr_elt_t = call_operand0.into_pointer_value().get_type().get_element_type();
         assert!(call_operand0_ptr_elt_t.is_int_type());
         assert!(call_operand0_ptr_elt_t.into_int_type().get_bit_width() == 1);
 
-        let call_operand1 = first_insn.get_operand(1).unwrap();
+        let call_operand1 = first_insn.get_operand_value(1).unwrap();
 
         assert!(call_operand1.is_pointer_value());   // should be evm.txctx *
 
@@ -977,7 +976,7 @@ mod tests {
         assert!(call_operand1_ptr_elt_t.is_struct_type());
         assert!(TransactionContextType::is_transaction_context_type(&call_operand1_ptr_elt_t.as_struct_type()));
 
-        let call_operand2 = first_insn.get_operand(2).unwrap();
+        let call_operand2 = first_insn.get_operand_value(2).unwrap();
         assert!(call_operand2.is_pointer_value());   // should be Env *
 
         let call_operand2_ptr_elt_t = call_operand2.into_pointer_value().get_type().get_element_type();
@@ -991,18 +990,18 @@ mod tests {
 
         assert_eq!(second_insn.get_num_operands(), 3);
 
-        let gep_operand0 = second_insn.get_operand(0).unwrap();
+        let gep_operand0 = second_insn.get_operand_value(0).unwrap();
         assert!(gep_operand0.is_pointer_value());
         let gep_operand0_ptr_elt_t = gep_operand0.into_pointer_value().get_type().get_element_type();
         assert!(gep_operand0_ptr_elt_t.is_struct_type());
         let gep_operand0_type = gep_operand0_ptr_elt_t.into_struct_type();
         assert!(TransactionContextType::is_transaction_context_type(&gep_operand0_type));
 
-        let gep_operand1 = second_insn.get_operand(1).unwrap();
+        let gep_operand1 = second_insn.get_operand_value(1).unwrap();
         assert!(gep_operand1.is_int_value());
         assert_eq!(gep_operand1.into_int_value(), context.i32_type().const_int(0, false));
 
-        let gep_operand2 = second_insn.get_operand(2).unwrap();
+        let gep_operand2 = second_insn.get_operand_value(2).unwrap();
         assert!(gep_operand2.is_int_value());
         assert_eq!(gep_operand2.into_int_value(), context.i32_type().const_int(6, false));
 
@@ -1010,7 +1009,7 @@ mod tests {
         let third_insn = second_insn.get_next_instruction().unwrap();
         assert_eq!(third_insn.get_opcode(), InstructionOpcode::Load);
 
-        let load_operand0 = third_insn.get_operand(0).unwrap();
+        let load_operand0 = third_insn.get_operand_value(0).unwrap();
         assert!(load_operand0.is_pointer_value());
 
         let load_operand0_ptr_elt_t = load_operand0.into_pointer_value().get_type().get_element_type();

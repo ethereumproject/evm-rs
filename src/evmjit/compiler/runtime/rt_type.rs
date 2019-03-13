@@ -167,34 +167,34 @@ impl<'a> RuntimeTypeManager<'a> {
                 m_env_ptr: env_p,
                 m_rt_data_elts: [builder.build_extract_value(data.into_struct_value(),
                                                              Gas.to_index() as u32,
-                                                             Gas.to_name()),
+                                                             Gas.to_name()).unwrap(),
                                  builder.build_extract_value(data.into_struct_value(),
                                                              GasPrice.to_index() as u32,
-                                                             GasPrice.to_name()),
+                                                             GasPrice.to_name()).unwrap(),
                                  builder.build_extract_value(data.into_struct_value(),
                                                              CallData.to_index() as u32,
-                                                             CallData.to_name()),
+                                                             CallData.to_name()).unwrap(),
                                  builder.build_extract_value(data.into_struct_value(),
                                                              CallDataSize.to_index() as u32,
-                                                             CallDataSize.to_name()),
+                                                             CallDataSize.to_name()).unwrap(),
                                  builder.build_extract_value(data.into_struct_value(),
                                                              Value.to_index() as u32,
-                                                             Value.to_name()),
+                                                             Value.to_name()).unwrap(),
                                  builder.build_extract_value(data.into_struct_value(),
                                                              Code.to_index() as u32,
-                                                             Code.to_name()),
+                                                             Code.to_name()).unwrap(),
                                  builder.build_extract_value(data.into_struct_value(),
                                                              CodeSize.to_index() as u32,
-                                                             CodeSize.to_name()),
+                                                             CodeSize.to_name()).unwrap(),
                                  builder.build_extract_value(data.into_struct_value(),
                                                              Address.to_index() as u32,
-                                                             Address.to_name()),
+                                                             Address.to_name()).unwrap(),
                                  builder.build_extract_value(data.into_struct_value(),
                                                              Sender.to_index() as u32,
-                                                             Sender.to_name()),
+                                                             Sender.to_name()).unwrap(),
                                  builder.build_extract_value(data.into_struct_value(),
                                                              Depth.to_index() as u32,
-                                                             Depth.to_name())],
+                                                             Depth.to_name()).unwrap()],
                 m_context: context,
                 m_builder: builder,
                 m_module: module
@@ -281,6 +281,7 @@ mod tests {
     use super::*;
     use inkwell::values::InstructionOpcode;
     use evmjit::compiler::evm_compiler::MainFuncCreator;
+    use evmjit::GetOperandValue;
 
     #[test]
     fn test_runtime_type() {
@@ -359,18 +360,18 @@ mod tests {
         assert_eq!(first_insn.get_opcode(), InstructionOpcode::GetElementPtr);
         assert_eq!(first_insn.get_num_operands(), 3);
 
-        let mut gep_operand0 = first_insn.get_operand(0).unwrap();
+        let mut gep_operand0 = first_insn.get_operand_value(0).unwrap();
         assert!(gep_operand0.is_pointer_value());
         let mut gep_operand0_ptr_elt_t = gep_operand0.into_pointer_value().get_type().get_element_type();
         assert!(gep_operand0_ptr_elt_t.is_struct_type());
         let mut gep_operand0_type = gep_operand0_ptr_elt_t.into_struct_type();
         assert!(RuntimeType::is_runtime_type (&gep_operand0_type));
 
-        let mut gep_operand1 = first_insn.get_operand(1).unwrap();
+        let mut gep_operand1 = first_insn.get_operand_value(1).unwrap();
         assert!(gep_operand1.is_int_value());
         assert_eq!(gep_operand1.into_int_value(), context.i32_type().const_int(0, false));
 
-        let mut gep_operand2 = first_insn.get_operand(2).unwrap();
+        let mut gep_operand2 = first_insn.get_operand_value(2).unwrap();
         assert!(gep_operand2.is_int_value());
         assert_eq!(gep_operand2.into_int_value(), context.i32_type().const_int(0, false));
 
@@ -378,7 +379,7 @@ mod tests {
         let second_insn = first_insn.get_next_instruction().unwrap();
         assert_eq!(second_insn.get_opcode(), InstructionOpcode::Load);
         assert_eq!(second_insn.get_num_operands(), 1);
-        let mut load_operand0 = second_insn.get_operand(0).unwrap();
+        let mut load_operand0 = second_insn.get_operand_value(0).unwrap();
         assert!(load_operand0.is_pointer_value());
         let mut load_operand0_ptr_elt_t = load_operand0.into_pointer_value().get_type().get_element_type();
         assert!(load_operand0_ptr_elt_t.is_pointer_type());
@@ -391,18 +392,18 @@ mod tests {
         let third_insn = second_insn.get_next_instruction().unwrap();
         assert_eq!(third_insn.get_opcode(), InstructionOpcode::GetElementPtr);
 
-        gep_operand0 = third_insn.get_operand(0).unwrap();
+        gep_operand0 = third_insn.get_operand_value(0).unwrap();
         assert!(gep_operand0.is_pointer_value());
         gep_operand0_ptr_elt_t = gep_operand0.into_pointer_value().get_type().get_element_type();
         assert!(gep_operand0_ptr_elt_t.is_struct_type());
         gep_operand0_type = gep_operand0_ptr_elt_t.into_struct_type();
         assert!(RuntimeType::is_runtime_type (&gep_operand0_type));
 
-        gep_operand1 = third_insn.get_operand(1).unwrap();
+        gep_operand1 = third_insn.get_operand_value(1).unwrap();
         assert!(gep_operand1.is_int_value());
         assert_eq!(gep_operand1.into_int_value(), context.i32_type().const_int(0, false));
 
-        gep_operand2 = third_insn.get_operand(2).unwrap();
+        gep_operand2 = third_insn.get_operand_value(2).unwrap();
         assert!(gep_operand2.is_int_value());
         assert_eq!(gep_operand2.into_int_value(), context.i32_type().const_int(2, false));
 
@@ -410,18 +411,18 @@ mod tests {
         let fourth_insn = third_insn.get_next_instruction().unwrap();
         assert_eq!(fourth_insn.get_opcode(), InstructionOpcode::GetElementPtr);
 
-        gep_operand0 = fourth_insn.get_operand(0).unwrap();
+        gep_operand0 = fourth_insn.get_operand_value(0).unwrap();
         assert!(gep_operand0.is_pointer_value());
         gep_operand0_ptr_elt_t = gep_operand0.into_pointer_value().get_type().get_element_type();
         assert!(gep_operand0_ptr_elt_t.is_struct_type());
         gep_operand0_type = gep_operand0_ptr_elt_t.into_struct_type();
         assert!(RuntimeType::is_runtime_type (&gep_operand0_type));
 
-        gep_operand1 = fourth_insn.get_operand(1).unwrap();
+        gep_operand1 = fourth_insn.get_operand_value(1).unwrap();
         assert!(gep_operand1.is_int_value());
         assert_eq!(gep_operand1.into_int_value(), context.i32_type().const_int(0, false));
 
-        gep_operand2 = fourth_insn.get_operand(2).unwrap();
+        gep_operand2 = fourth_insn.get_operand_value(2).unwrap();
         assert!(gep_operand2.is_int_value());
         assert_eq!(gep_operand2.into_int_value(), context.i32_type().const_int(1, false));
 
@@ -430,7 +431,7 @@ mod tests {
         assert_eq!(fifth_insn.get_opcode(), InstructionOpcode::Load);
 
         assert_eq!(fifth_insn.get_num_operands(), 1);
-        load_operand0 = fifth_insn.get_operand(0).unwrap();
+        load_operand0 = fifth_insn.get_operand_value(0).unwrap();
         assert!(load_operand0.is_pointer_value());
         load_operand0_ptr_elt_t = load_operand0.into_pointer_value().get_type().get_element_type();
         assert!(load_operand0_ptr_elt_t.is_pointer_type());
@@ -444,7 +445,7 @@ mod tests {
         assert_eq!(sixth_insn.get_opcode(), InstructionOpcode::Load);
 
         assert_eq!(sixth_insn.get_num_operands(), 1);
-        load_operand0 = sixth_insn.get_operand(0).unwrap();
+        load_operand0 = sixth_insn.get_operand_value(0).unwrap();
         assert!(load_operand0.is_pointer_value());
         load_operand0_ptr_elt_t = load_operand0.into_pointer_value().get_type().get_element_type();
         assert!(load_operand0_ptr_elt_t.is_struct_type());
@@ -456,8 +457,8 @@ mod tests {
         assert_eq!(seventh_insn.get_opcode(), InstructionOpcode::ExtractValue);
 
 
-        assert!(seventh_insn.get_operand(0) != None);
-        let mut extract_val_operand0 = seventh_insn.get_operand(0).unwrap();
+        assert!(seventh_insn.get_operand_value(0) != None);
+        let mut extract_val_operand0 = seventh_insn.get_operand_value(0).unwrap();
         assert!(extract_val_operand0.is_struct_value());
         let extract_val_type = extract_val_operand0.into_struct_value().get_type();
         assert!(RuntimeDataType::is_rt_data_type (&extract_val_type));
@@ -465,7 +466,7 @@ mod tests {
         let eighth_insn = seventh_insn.get_next_instruction().unwrap();
         assert_eq!(eighth_insn.get_opcode(), InstructionOpcode::ExtractValue);
 
-        extract_val_operand0 = eighth_insn.get_operand(0).unwrap();
+        extract_val_operand0 = eighth_insn.get_operand_value(0).unwrap();
         assert!(extract_val_operand0.is_struct_value());
         let extract_val_type = extract_val_operand0.into_struct_value().get_type();
         assert!(RuntimeDataType::is_rt_data_type (&extract_val_type));
@@ -474,7 +475,7 @@ mod tests {
         let ninth_insn = eighth_insn.get_next_instruction().unwrap();
         assert_eq!(ninth_insn.get_opcode(), InstructionOpcode::ExtractValue);
 
-        extract_val_operand0 = ninth_insn.get_operand(0).unwrap();
+        extract_val_operand0 = ninth_insn.get_operand_value(0).unwrap();
         assert!(extract_val_operand0.is_struct_value());
         let extract_val_type = extract_val_operand0.into_struct_value().get_type();
         assert!(RuntimeDataType::is_rt_data_type (&extract_val_type));
@@ -483,7 +484,7 @@ mod tests {
         let tenth_insn = ninth_insn.get_next_instruction().unwrap();
         assert_eq!(tenth_insn.get_opcode(), InstructionOpcode::ExtractValue);
 
-        extract_val_operand0 = tenth_insn.get_operand(0).unwrap();
+        extract_val_operand0 = tenth_insn.get_operand_value(0).unwrap();
         assert!(extract_val_operand0.is_struct_value());
         let extract_val_type = extract_val_operand0.into_struct_value().get_type();
         assert!(RuntimeDataType::is_rt_data_type (&extract_val_type));
@@ -492,7 +493,7 @@ mod tests {
         let eleventh_insn = tenth_insn.get_next_instruction().unwrap();
         assert_eq!(eleventh_insn.get_opcode(), InstructionOpcode::ExtractValue);
 
-        extract_val_operand0 = eleventh_insn.get_operand(0).unwrap();
+        extract_val_operand0 = eleventh_insn.get_operand_value(0).unwrap();
         assert!(extract_val_operand0.is_struct_value());
         let extract_val_type = extract_val_operand0.into_struct_value().get_type();
         assert!(RuntimeDataType::is_rt_data_type (&extract_val_type));
@@ -501,7 +502,7 @@ mod tests {
         let twelfth_insn = eleventh_insn.get_next_instruction().unwrap();
         assert_eq!(twelfth_insn.get_opcode(), InstructionOpcode::ExtractValue);
 
-        extract_val_operand0 = twelfth_insn.get_operand(0).unwrap();
+        extract_val_operand0 = twelfth_insn.get_operand_value(0).unwrap();
         assert!(extract_val_operand0.is_struct_value());
         let extract_val_type = extract_val_operand0.into_struct_value().get_type();
         assert!(RuntimeDataType::is_rt_data_type (&extract_val_type));
@@ -510,7 +511,7 @@ mod tests {
         let thirteenth_insn = twelfth_insn.get_next_instruction().unwrap();
         assert_eq!(thirteenth_insn.get_opcode(), InstructionOpcode::ExtractValue);
 
-        extract_val_operand0 = thirteenth_insn.get_operand(0).unwrap();
+        extract_val_operand0 = thirteenth_insn.get_operand_value(0).unwrap();
         assert!(extract_val_operand0.is_struct_value());
         let extract_val_type = extract_val_operand0.into_struct_value().get_type();
         assert!(RuntimeDataType::is_rt_data_type (&extract_val_type));
@@ -519,7 +520,7 @@ mod tests {
         let fourteenth_insn = thirteenth_insn.get_next_instruction().unwrap();
         assert_eq!(fourteenth_insn.get_opcode(), InstructionOpcode::ExtractValue);
 
-        extract_val_operand0 = fourteenth_insn.get_operand(0).unwrap();
+        extract_val_operand0 = fourteenth_insn.get_operand_value(0).unwrap();
         assert!(extract_val_operand0.is_struct_value());
         let extract_val_type = extract_val_operand0.into_struct_value().get_type();
         assert!(RuntimeDataType::is_rt_data_type (&extract_val_type));
@@ -528,7 +529,7 @@ mod tests {
         let fifteenth_insn = fourteenth_insn.get_next_instruction().unwrap();
         assert_eq!(fifteenth_insn.get_opcode(), InstructionOpcode::ExtractValue);
 
-        extract_val_operand0 = fifteenth_insn.get_operand(0).unwrap();
+        extract_val_operand0 = fifteenth_insn.get_operand_value(0).unwrap();
         assert!(extract_val_operand0.is_struct_value());
         let extract_val_type = extract_val_operand0.into_struct_value().get_type();
         assert!(RuntimeDataType::is_rt_data_type (&extract_val_type));
@@ -537,7 +538,7 @@ mod tests {
         let sixteenth_insn = fifteenth_insn.get_next_instruction().unwrap();
         assert_eq!(sixteenth_insn.get_opcode(), InstructionOpcode::ExtractValue);
 
-        extract_val_operand0 = sixteenth_insn.get_operand(0).unwrap();
+        extract_val_operand0 = sixteenth_insn.get_operand_value(0).unwrap();
         assert!(extract_val_operand0.is_struct_value());
         let extract_val_type = extract_val_operand0.into_struct_value().get_type();
         assert!(RuntimeDataType::is_rt_data_type (&extract_val_type));
