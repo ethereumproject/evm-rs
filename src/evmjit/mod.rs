@@ -6,6 +6,9 @@ use inkwell::context::Context;
 use inkwell::builder::Builder;
 use inkwell::module::Module;
 use inkwell::values::FunctionValue;
+use inkwell::values::InstructionValue;
+use inkwell::values::BasicValueEnum;
+use inkwell::basic_block::BasicBlock;
 
 pub mod compiler;
 
@@ -42,6 +45,36 @@ impl ModuleLookup for Module {
             true
         } else {
             false
+        }
+    }
+}
+
+pub trait GetOperandValue {
+    fn get_operand_value(&self, index: u32) -> Option<BasicValueEnum>;
+}
+
+impl GetOperandValue for InstructionValue {
+    fn get_operand_value(&self, index: u32) -> Option<BasicValueEnum> {
+        let operand = self.get_operand(index);
+        if operand == None {
+            None
+        } else {
+            Some(operand.unwrap().left().unwrap())
+        }
+    }
+}
+
+pub trait GetOperandBasicBlock {
+    fn get_operand_as_bb(&self, index: u32) -> Option<BasicBlock>;
+}
+
+impl GetOperandBasicBlock for InstructionValue {
+    fn get_operand_as_bb(&self, index: u32) -> Option<BasicBlock> {
+        let operand = self.get_operand(index);
+        if operand == None {
+            None
+        } else {
+            Some(operand.unwrap().right().unwrap())
         }
     }
 }
