@@ -17,7 +17,7 @@ struct ExceptionManager {
 
 impl ExceptionManager {
     pub fn new(context: &Context, builder: &Builder, module: &Module,
-               normal_path_bb: BasicBlock, exception_bb: BasicBlock) -> ExceptionManager {
+               normal_path_bb: &BasicBlock, exception_bb: &BasicBlock) -> ExceptionManager {
 
         let types_instance = EvmTypes::get_instance(context);
         let buf_size = context.i64_type().const_int(3, false);
@@ -75,10 +75,13 @@ impl ExceptionManager {
 
 #[cfg(test)]
 mod tests {
-    use std::ffi::CString;
     use super::*;
     use inkwell::values::InstructionOpcode;
     use evmjit::compiler::evm_compiler::MainFuncCreator;
+    use evmjit::compiler::runtime::RuntimeManager;
+    use inkwell::values::BasicValue;
+    use evmjit::GetOperandValue;
+    use evmjit::GetOperandBasicBlock;
 
     #[test]
     fn test_exception_manager() {
@@ -87,7 +90,163 @@ mod tests {
         let builder = context.create_builder();
 
         // Generate outline of main function needed by 'RuntimeTypeManager
-        MainFuncCreator::new ("main", &context, &builder, &module);
+        let main_func = MainFuncCreator::new ("main", &context, &builder, &module);
+        let _runtime = RuntimeManager::new(&context, &builder, &module);
+
+        let normal_path_block = main_func.get_entry_bb().get_next_basic_block();
+        assert!(normal_path_block != None);
+        let normal_block = normal_path_block.unwrap();
+        let exception_block = main_func.get_abort_bb();
+
+        // Create a basic block to put exception handler code in so we can test it independently
+        let main_fn_optional = module.get_function ("main");
+        assert!(main_fn_optional != None);
+        let main_fn = main_fn_optional.unwrap();
+        let exception_handler_bb = context.append_basic_block(&main_fn, "exception_handler_bb");
+
+        builder.position_at_end(&exception_handler_bb);
+
+        let _exception_mgr = ExceptionManager::new(&context, &builder, &module, &normal_block, exception_block);
+
+        module.print_to_stderr();
+
+        assert!(exception_handler_bb.get_first_instruction() != None);
+
+        // alloca i8*, i64 3
+        let first_insn = exception_handler_bb.get_first_instruction().unwrap();
+        assert_eq!(first_insn.get_opcode(), InstructionOpcode::Alloca);
+        assert_eq!(first_insn.get_num_operands(), 1);
+        let alloca_operand0 = first_insn.get_operand_value(0).unwrap();
+        assert!(alloca_operand0.is_int_value());
+        assert_eq!(alloca_operand0.into_int_value(), context.i64_type().const_int(3, false));
+
+        assert!(first_insn.get_next_instruction() != None);
+        let second_insn = first_insn.get_next_instruction().unwrap();
+        assert_eq!(second_insn.get_opcode(), InstructionOpcode::Call);
+        assert_eq!(second_insn.get_num_operands(), 2);
+
+        let call_operand0 = second_insn.get_operand_value(0).unwrap();
+        assert!(call_operand0.is_int_value());
+        assert_eq!(call_operand0.into_int_value(), context.i32_type().const_int(0, false));
+
+        assert!(second_insn.get_next_instruction() != None);
+        let third_insn = second_insn.get_next_instruction().unwrap();
+        assert_eq!(third_insn.get_opcode(), InstructionOpcode::Store);
+        assert_eq!(third_insn.get_num_operands(), 2);
+
+        let store_operand0 = third_insn.get_operand_value(0).unwrap();
+        assert!(store_operand0.is_pointer_value());
+        let store_operand0_ptr_elt_t = store_operand0.into_pointer_value().get_type().get_element_type();
+        assert!(store_operand0_ptr_elt_t.is_int_type());
+        assert_eq!(store_operand0_ptr_elt_t.into_int_type(), context.i8_type());
+
+        let store_operand1 = third_insn.get_operand_value(1).unwrap().as_basic_value_enum();
+        assert!(store_operand1.is_pointer_value());
+        let store_operand1_ptr_elt_t = store_operand1.into_pointer_value().get_type().get_element_type();
+        assert!(store_operand1_ptr_elt_t.is_pointer_type());
+        let store_operand1_ptr_to_ptr_elt_t = store_operand1_ptr_elt_t.into_pointer_type().get_element_type();
+        assert!(store_operand1_ptr_to_ptr_elt_t.is_int_type());
+        assert_eq!(store_operand1_ptr_to_ptr_elt_t.into_int_type(), context.i8_type());
+
+        assert!(third_insn.get_next_instruction() != None);
+        let fourth_insn = third_insn.get_next_instruction().unwrap();
+        assert_eq!(fourth_insn.get_opcode(), InstructionOpcode::Call);
+        assert_eq!(fourth_insn.get_num_operands(), 1);
+
+        assert!(fourth_insn.get_next_instruction() != None);
+
+        // getelementptr inbounds i8*, i8** %jmpbuf.words, i64 2
+
+        let fifth_insn = fourth_insn.get_next_instruction().unwrap();
+        assert_eq!(fifth_insn.get_opcode(), InstructionOpcode::GetElementPtr);
+        assert_eq!(fifth_insn.get_num_operands(), 2);
+
+        let gep_operand0 = fifth_insn.get_operand_value(0).unwrap();
+        assert!(gep_operand0.is_pointer_value());
+        let gep_operand0_ptr_elt_t = gep_operand0.into_pointer_value().get_type().get_element_type();
+        assert!(gep_operand0_ptr_elt_t.is_pointer_type());
+        let gep_operand0_ptr_to_ptr_elt_t = gep_operand0_ptr_elt_t.into_pointer_type().get_element_type();
+        assert!(gep_operand0_ptr_to_ptr_elt_t.is_int_type());
+        assert_eq!(gep_operand0_ptr_to_ptr_elt_t.into_int_type(), context.i8_type());
+
+        let gep_operand1 = fifth_insn.get_operand_value(1).unwrap();
+        assert!(gep_operand1.is_int_value());
+        assert_eq!(gep_operand1.into_int_value(), context.i64_type().const_int(2, false));
+
+        assert!(fifth_insn.get_next_instruction() != None);
+
+        // store i8* %sp, i8** %jmpBuf.sp
+        let sixth_insn = fifth_insn.get_next_instruction().unwrap();
+        assert_eq!(sixth_insn.get_opcode(), InstructionOpcode::Store);
+        assert_eq!(sixth_insn.get_num_operands(), 2);
+
+        let sixth_insn_store_operand0 = sixth_insn.get_operand_value(0).unwrap();
+        assert!(sixth_insn_store_operand0.is_pointer_value());
+        let sixth_insn_store_operand0_ptr_elt_t = sixth_insn_store_operand0.into_pointer_value().get_type().get_element_type();
+        assert!(sixth_insn_store_operand0_ptr_elt_t.is_int_type());
+        assert_eq!(sixth_insn_store_operand0_ptr_elt_t.into_int_type(), context.i8_type());
+
+        let sixth_insn_store_operand1 = sixth_insn.get_operand_value(1).unwrap();
+        assert!(sixth_insn_store_operand1.is_pointer_value());
+        let sixth_insn_store_operand1_ptr_elt_t = sixth_insn_store_operand1.into_pointer_value().get_type().get_element_type();
+        assert!(sixth_insn_store_operand1_ptr_elt_t.is_pointer_type());
+        let sixth_insn_store_operand1_ptr_to_ptr_elt_t = sixth_insn_store_operand1_ptr_elt_t.into_pointer_type().get_element_type();
+        assert!(sixth_insn_store_operand1_ptr_to_ptr_elt_t.is_int_type());
+        assert_eq!(sixth_insn_store_operand1_ptr_to_ptr_elt_t.into_int_type(), context.i8_type());
+
+        assert!(sixth_insn.get_next_instruction() != None);
+
+        // bitcast i8** %jmpbuf.words to i8*
+
+        let seventh_insn = sixth_insn.get_next_instruction().unwrap();
+        assert_eq!(seventh_insn.get_opcode(), InstructionOpcode::BitCast);
+        assert_eq!(seventh_insn.get_num_operands(), 1);
+
+        let bitcast_operand0 = seventh_insn.get_operand_value(0).unwrap();
+        assert!(bitcast_operand0.is_pointer_value());
+        let bitcast_operand0_ptr_elt_t = bitcast_operand0.into_pointer_value().get_type().get_element_type();
+        assert!(bitcast_operand0_ptr_elt_t.is_pointer_type());
+
+        let bitcast_operand0_ptr_to_ptr_elt_t = bitcast_operand0_ptr_elt_t.into_pointer_type().get_element_type();
+        assert_eq!(bitcast_operand0_ptr_to_ptr_elt_t.into_int_type(), context.i8_type());
+
+        assert!(seventh_insn.get_next_instruction() != None);
+        let eighth_insn = seventh_insn.get_next_instruction().unwrap();
+        assert_eq!(eighth_insn.get_opcode(), InstructionOpcode::Call);
+        assert_eq!(eighth_insn.get_num_operands(), 2);
+
+        // call i32 @llvm.eh.sjlj.setjmp(i8* %jmpBuf)
+
+        let eighth_insn_call_operand0 = eighth_insn.get_operand_value(0).unwrap();
+        assert!(eighth_insn_call_operand0.is_pointer_value());
+        let eighth_insn_call_operand0_ptr_elt_t = eighth_insn_call_operand0.into_pointer_value().get_type().get_element_type();
+        assert!(eighth_insn_call_operand0_ptr_elt_t.is_int_type());
+        assert_eq!(eighth_insn_call_operand0_ptr_elt_t.into_int_type(), context.i8_type());
+
+        assert!(eighth_insn.get_next_instruction() != None);
+
+        // icmp eq i32 %2, 0
+        let ninth_insn = eighth_insn.get_next_instruction().unwrap();
+        assert_eq!(ninth_insn.get_opcode(), InstructionOpcode::ICmp);
+        assert_eq!(ninth_insn.get_num_operands(), 2);
+
+        let icmp_operand0 = ninth_insn.get_operand_value(0).unwrap();
+        assert!(icmp_operand0.is_int_value());
+
+        let icmp_operand1 = ninth_insn.get_operand_value(1).unwrap();
+        assert!(icmp_operand1.is_int_value());
+        assert_eq!(icmp_operand1.into_int_value(), context.i32_type().const_int(0, false));
+
+        // br i1 %3, label %Stop, label %Abort
+        assert!(ninth_insn.get_next_instruction() != None);
+        let tenth_insn = ninth_insn.get_next_instruction().unwrap();
+        assert_eq!(tenth_insn.get_num_operands(), 3);
+
+        let bb1 = tenth_insn.get_operand_as_bb(1).unwrap();
+        assert_eq!(bb1.get_name().to_str(), Ok("Abort"));
+
+        let bb2 = tenth_insn.get_operand_as_bb(2).unwrap();
+        assert_eq!(bb2.get_name().to_str(), Ok("Stop"));
 
     }
 }
