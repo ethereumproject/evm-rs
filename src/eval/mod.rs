@@ -48,7 +48,7 @@ macro_rules! reset_error_not_supported {
     }
 }
 
-mod cost;
+pub mod cost;
 mod run;
 mod check;
 mod util;
