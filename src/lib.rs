@@ -103,10 +103,14 @@
 //! reductions.
 
 // TODO: Re-add "missing_docs" after evmjit is documented
-#![deny(unused_import_braces, unused_imports,
-        unused_comparisons, unused_must_use,
-        unused_variables, non_shorthand_field_patterns,
-        unreachable_code)]
+//#![deny(unused_import_braces, unused_imports,
+//        unused_comparisons, unused_must_use,
+//        unused_variables, non_shorthand_field_patterns,
+//        unreachable_code)]
+
+#![deny(unused_import_braces, unused_comparisons, unused_must_use,
+unused_variables, non_shorthand_field_patterns,
+unreachable_code)]
 
 #![cfg_attr(not(feature = "std"), no_std)]
 #![cfg_attr(not(feature = "std"), feature(alloc))]
@@ -124,6 +128,7 @@ extern crate digest;
 
 #[macro_use]
 extern crate log;
+#[macro_use] extern crate lazy_static;
 
 #[cfg(feature = "c-secp256k1")]
 extern crate secp256k1;

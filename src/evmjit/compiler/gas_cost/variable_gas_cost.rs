@@ -43,10 +43,66 @@ mod tests {
     use evmjit::compiler::intrinsics::LLVMIntrinsicManager;
     use singletonum::Singleton;
     use inkwell::context::Context;
-    //use inkwell::module::Module;
-    //use inkwell::builder::Builder;
+    use inkwell::module::Module;
+    use inkwell::builder::Builder;
     use inkwell::types::BasicTypeEnum;
-    //use inkwell::types::IntType;
+    use inkwell::types::IntType;
+    use bigint::Gas;
+    use inkwell::execution_engine::{ExecutionEngine, JitFunction, FunctionLookupError};
+    use inkwell::OptimizationLevel;
+    use inkwell::values::IntValue;
+
+    //IntType::custom_width_int_type(256);
+    //lazy_static! {
+    //    static I256_T: IntType = IntType::custom_width_int_type(256);
+    //}
+
+    type Log2Func = unsafe extern "C" fn(Gas) -> u64;
+
+
+    fn jit_compile_log2(
+        context: &Context,
+        module: &Module,
+        builder: &Builder,
+        execution_engine: &ExecutionEngine,
+    ) -> Result<JitFunction<Log2Func>, FunctionLookupError> {
+        let types_instance = EvmTypes::get_instance(&context);
+        let word_type = types_instance.get_word_type();
+        let enum_word_type: BasicTypeEnum = BasicTypeEnum::IntType(word_type);
+        let gas_type = types_instance.get_gas_type();
+
+        let i64_type = context.i64_type();
+        let fn_type = i64_type.fn_type(&[word_type.into()], false);
+
+        // Get declaration of ctlz
+        let ctlz_decl = LLVMIntrinsic::Ctlz.get_intrinsic_declaration(&context,
+                                                                      &module,
+                                                                      Some(enum_word_type));
+
+        let function = module.add_function("mylog2", fn_type, None);
+        let basic_block = context.append_basic_block(&function, "entry");
+
+        builder.position_at_end(&basic_block);
+
+        //let x = function.get_nth_param(0).unwrap().into_int_value();
+        let x = context.custom_width_int_type(256).const_int_from_string("55", 10);
+
+        let lz256 = builder.build_call (ctlz_decl, &[x.into(), context.bool_type().const_zero().into()], "lz256");
+        let val = lz256.try_as_basic_value().left().unwrap().into_int_value();
+        let lz = builder.build_int_truncate(val, gas_type, "lz");
+
+        let temp1 = context.i64_type().const_int(256, false);
+        let sig_bits = builder.build_int_sub(temp1, lz, "sigBits");
+
+        let one = context.i64_type().const_int(1, false);
+        let log2val = builder.build_int_sub (sig_bits, one, "log2");
+
+
+
+        builder.build_return(Some(&log2val));
+
+        unsafe { execution_engine.get_function::<Log2Func>("mylog2") }
+    }
 
     #[test]
     fn test_log2() {
@@ -60,30 +116,24 @@ mod tests {
     fn test_log2_using_jit() {
         let context = Context::create();
         let module = context.create_module("evm_module");
-        let types_instance = EvmTypes::get_instance(&context);
-        let word_type = types_instance.get_word_type();
-        let enum_word_type = BasicTypeEnum::IntType(word_type);
+        //let types_instance = EvmTypes::get_instance(&context);
+        //let word_type = types_instance.get_word_type();
+        //let enum_word_type = BasicTypeEnum::IntType(word_type);
         let builder = context.create_builder();
 
-        // Get declaration of ctlz
-        let ctlz_decl = LLVMIntrinsic::Ctlz.get_intrinsic_declaration(&context,
-                                                                      &module,
-                                                                      Some(enum_word_type));
+        let execution_engine = module.create_jit_execution_engine(OptimizationLevel::None).unwrap();
 
-        let const_256 = context.custom_width_int_type(256).const_int_from_string("55", 10);
+        let mylog = jit_compile_log2(&context, &module, &builder, &execution_engine).unwrap();
 
-        //auto lz256 = m_builder.CreateCall(ctlz, {_exponent, m_builder.getInt1(false)});
-        //auto lz = m_builder.CreateTrunc(lz256, Type::Gas, "lz");
-        //auto sigBits = m_builder.CreateSub(m_builder.getInt64(256), lz, "sigBits");
+        module.print_to_stderr();
 
-        let lz256 = builder.build_call (ctlz_decl, &[const_256.into(), context.bool_type().const_zero().into()], "lz256");
-        let val = lz256.try_as_basic_value().left().unwrap().into_int_value();
-        let lz = builder.build_int_truncate(val, word_type, "lz");
+        //let x = context.custom_width_int_type(256).const_int(55, false);
+        //let x = context.custom_width_int_type(256).const_int_from_string("55", 10);
+        let x = Gas::from(55u64);
 
-        let temp1 = context.i64_type().const_int(256, false);
-        let one = context.i64_type().const_int(1, false);
-        let sigBits = builder.build_int_sub(temp1, lz, "sigBits");
-        let log2Val = builder.build_int_sub (sigBits, one, "log2");
+        unsafe {
+            assert_eq!(mylog.call(x), 5);
+        }
 
     }
 }
