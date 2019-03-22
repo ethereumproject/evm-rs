@@ -128,7 +128,6 @@ extern crate digest;
 
 #[macro_use]
 extern crate log;
-#[macro_use] extern crate lazy_static;
 
 #[cfg(feature = "c-secp256k1")]
 extern crate secp256k1;
