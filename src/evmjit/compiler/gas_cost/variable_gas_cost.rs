@@ -16,20 +16,20 @@ use eval::cost::G_LOGDATA;
 use eval::cost::G_SHA3WORD;
 use eval::cost::G_COPY;
 
-struct VariableGasCostCalculator<'a> {
+pub struct VariableGasCostCalculator<'a, P: Patch> {
     m_context: &'a Context,
     m_builder: &'a Builder,
-    m_module: &'a Module
+    m_module: &'a Module,
 }
 
-impl<'a> VariableGasCostCalculator<'a> {
+impl<'a, P: Patch> VariableGasCostCalculator<'a, P> {
 
-    pub fn new(context: &'a Context, builder: &'a Builder, module: &'a Module) -> VariableGasCostCalculator<'a> {
+    pub fn new(context: &'a Context, builder: &'a Builder, module: &'a Module) -> VariableGasCostCalculator<'a, P> {
 
         VariableGasCostCalculator {
             m_context: context,
             m_builder: builder,
-            m_module: module
+            m_module: module,
         }
     }
 
@@ -106,7 +106,7 @@ impl<'a> VariableGasCostCalculator<'a> {
         copy_data_cost
     }
 
-    pub fn exp_cost<P: Patch>(&self, current_block: &BasicBlock, exponent: IntValue) -> IntValue {
+    pub fn exp_cost(&self, current_block: &BasicBlock, exponent: IntValue) -> IntValue {
         let types_instance = EvmTypes::get_instance(&self.m_context);
         let word_type = types_instance.get_word_type();
         let enum_word_type: BasicTypeEnum = BasicTypeEnum::IntType(word_type);
@@ -283,10 +283,10 @@ mod tests {
 
         builder.position_at_end(&entry_bb);
 
-        let gas_calculator = VariableGasCostCalculator::new(&context, &builder, &module);
+        let gas_calculator: VariableCostCalculator<EmbeddedPatch> = VariableGasCostCalculator::new(&context, &builder, &module);
 
         let exponent = context.custom_width_int_type(256).const_int(55, false);
-        gas_calculator.exp_cost::<EmbeddedPatch>(entry_bb, exponent);
+        gas_calculator.exp_cost(entry_bb, exponent);
         module.print_to_stderr();
     }
 
@@ -307,7 +307,7 @@ mod tests {
 
         builder.position_at_end(&entry_bb);
 
-        let gas_calculator = VariableGasCostCalculator::new(&context, &builder, &module);
+        let gas_calculator: VariableCostCalculator<EmbeddedPatch> = VariableGasCostCalculator::new(&context, &builder, &module);
 
         let log_data_length = context.custom_width_int_type(256).const_int(30, false);
         gas_calculator.log_data_cost(log_data_length);
@@ -331,7 +331,7 @@ mod tests {
 
         builder.position_at_end(&entry_bb);
 
-        let gas_calculator = VariableGasCostCalculator::new(&context, &builder, &module);
+        let gas_calculator: VariableCostCalculator<EmbeddedPatch> = VariableGasCostCalculator::new(&context, &builder, &module);
 
         let sha3_data_len = context.custom_width_int_type(256).const_int(19, false);
         gas_calculator.sha3_data_cost(sha3_data_len);
@@ -355,7 +355,7 @@ mod tests {
 
         builder.position_at_end(&entry_bb);
 
-        let gas_calculator = VariableGasCostCalculator::new(&context, &builder, &module);
+        let gas_calculator: VariableCostCalculator<EmbeddedPatch> = VariableGasCostCalculator::new(&context, &builder, &module);
 
         let copy_data_len = context.custom_width_int_type(256).const_int(157, false);
         gas_calculator.copy_data_cost(copy_data_len);
