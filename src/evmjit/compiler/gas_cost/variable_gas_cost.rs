@@ -1,4 +1,5 @@
 use bigint::Gas;
+use std::marker::PhantomData;
 use patch::Patch;
 use inkwell::values::IntValue;
 use inkwell::types::BasicTypeEnum;
@@ -20,6 +21,7 @@ pub struct VariableGasCostCalculator<'a, P: Patch> {
     m_context: &'a Context,
     m_builder: &'a Builder,
     m_module: &'a Module,
+    _marker: PhantomData<P>
 }
 
 impl<'a, P: Patch> VariableGasCostCalculator<'a, P> {
@@ -30,6 +32,7 @@ impl<'a, P: Patch> VariableGasCostCalculator<'a, P> {
             m_context: context,
             m_builder: builder,
             m_module: module,
+            _marker: PhantomData
         }
     }
 
@@ -283,7 +286,7 @@ mod tests {
 
         builder.position_at_end(&entry_bb);
 
-        let gas_calculator: VariableCostCalculator<EmbeddedPatch> = VariableGasCostCalculator::new(&context, &builder, &module);
+        let gas_calculator: VariableGasCostCalculator<EmbeddedPatch> = VariableGasCostCalculator::new(&context, &builder, &module);
 
         let exponent = context.custom_width_int_type(256).const_int(55, false);
         gas_calculator.exp_cost(entry_bb, exponent);
@@ -307,7 +310,7 @@ mod tests {
 
         builder.position_at_end(&entry_bb);
 
-        let gas_calculator: VariableCostCalculator<EmbeddedPatch> = VariableGasCostCalculator::new(&context, &builder, &module);
+        let gas_calculator: VariableGasCostCalculator<EmbeddedPatch> = VariableGasCostCalculator::new(&context, &builder, &module);
 
         let log_data_length = context.custom_width_int_type(256).const_int(30, false);
         gas_calculator.log_data_cost(log_data_length);
@@ -331,7 +334,7 @@ mod tests {
 
         builder.position_at_end(&entry_bb);
 
-        let gas_calculator: VariableCostCalculator<EmbeddedPatch> = VariableGasCostCalculator::new(&context, &builder, &module);
+        let gas_calculator: VariableGasCostCalculator<EmbeddedPatch> = VariableGasCostCalculator::new(&context, &builder, &module);
 
         let sha3_data_len = context.custom_width_int_type(256).const_int(19, false);
         gas_calculator.sha3_data_cost(sha3_data_len);
@@ -355,7 +358,7 @@ mod tests {
 
         builder.position_at_end(&entry_bb);
 
-        let gas_calculator: VariableCostCalculator<EmbeddedPatch> = VariableGasCostCalculator::new(&context, &builder, &module);
+        let gas_calculator: VariableGasCostCalculator<EmbeddedPatch> = VariableGasCostCalculator::new(&context, &builder, &module);
 
         let copy_data_len = context.custom_width_int_type(256).const_int(157, false);
         gas_calculator.copy_data_cost(copy_data_len);
