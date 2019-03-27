@@ -11,7 +11,7 @@ use evmjit::compiler::intrinsics::LLVMIntrinsic;
 use evmjit::compiler::intrinsics::LLVMIntrinsicManager;
 use singletonum::Singleton;
 
-struct ExceptionManager {
+pub struct ExceptionManager {
     exception_dest: PointerValue,
 }
 
