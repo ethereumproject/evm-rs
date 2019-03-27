@@ -29,6 +29,8 @@ use evmjit::compiler::evmconstants::EvmConstants;
 use llvm_sys::LLVMCallConv::*;
 use evmjit::ModuleLookup;
 use evmjit::LLVMAttributeFactory;
+use evmjit::compiler::intrinsics::LLVMIntrinsic;
+use evmjit::compiler::intrinsics::LLVMIntrinsicManager;
 
 #[derive(PartialEq)]
 pub enum TransactionContextTypeFields {
@@ -282,6 +284,14 @@ impl<'a> RuntimeManager<'a> {
     pub fn reset_return_buf(self) {
         self.m_return_buf_manager.reset_return_buf()
     }
+
+    pub fn abort(&self, jmp_buf: PointerValue) {
+        let func_decl = LLVMIntrinsic::LongJmp.get_intrinsic_declaration(&self.m_context,
+                                                                         &self.m_module,
+                                                                         None);
+        self.m_builder.build_call (func_decl, &[jmp_buf.into()], "longJmp");
+    }
+
 }
 
 #[cfg(test)]
