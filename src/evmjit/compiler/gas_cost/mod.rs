@@ -5,6 +5,7 @@ pub mod variable_gas_cost;
 
 use std::cell::Cell;
 use std::cell::RefCell;
+use std::cell::Ref;
 
 use patch::Patch;
 use util::opcode::Opcode;
@@ -40,7 +41,7 @@ pub trait InstructionGasCost {
 
 
 pub trait BasicBlockGasCost: InstructionGasCost {
-    fn finalize_block_cost();
+    fn finalize_block_cost(&self);
 }
 
 
@@ -128,17 +129,6 @@ impl<'a, P: Patch> BasicBlockGasManager<'a, P> {
     }
 
     fn count_variable_cost(&self, cost: IntValue, exc_mgr: &ExceptionManager) {
-        // if (_cost->getType() == Type::Word)
-        //	{
-        //		auto gasMax256 = m_builder.CreateZExt(Constant::gasMax, Type::Word);
-        //		auto tooHigh = m_builder.CreateICmpUGT(_cost, gasMax256, "costTooHigh");
-        //		auto cost64 = m_builder.CreateTrunc(_cost, Type::Gas);
-        //		_cost = m_builder.CreateSelect(tooHigh, Constant::gasMax, cost64, "cost");
-        //	}
-        //
-        //	assert(_cost->getType() == Type::Gas);
-        //	m_builder.CreateCall(m_gasCheckFunc, {_gasPtr ? _gasPtr : m_runtimeManager.getGasPtr(), _cost, _jmpBuf ? _jmpBuf : m_runtimeManager.getJmpBuf()});
-
         let types_instance = EvmTypes::get_instance(self.m_context);
         let word_type = types_instance.get_word_type();
 
@@ -172,33 +162,24 @@ impl<'a, P: Patch> BasicBlockGasManager<'a, P> {
     }
 
     pub fn has_gas_check_call(&self) -> bool {
-        self.get_gas_check_call() != None
+        self.get_gas_check_call().is_some()
     }
 
-    fn get_gas_check_call(&self) -> Option<CallSiteValue> {
-        *self.m_gas_check_call.borrow()
+    fn get_gas_check_call(&self) -> Ref<Option<CallSiteValue>> {
+        self.m_gas_check_call.borrow()
     }
 
-    fn update_gas_check_call(&mut self, callsite: CallSiteValue) {
+    pub fn update_gas_check_call(&mut self, callsite: CallSiteValue) {
         *self.m_gas_check_call.borrow_mut() = Some(callsite);
     }
 
-    fn reset_gas_check_call(&mut self) {
+    pub fn reset_gas_check_call(&mut self) {
         *self.m_gas_check_call.borrow_mut() = None;
     }
 }
 
 impl<'a, P: Patch> InstructionGasCost for BasicBlockGasManager<'a, P> {
-
-    // if (!m_checkCall)
-    //	{
-    //		// Create gas check call with mocked block cost at begining of current cost-block
-    //		m_checkCall = m_builder.CreateCall(m_gasCheckFunc, {m_runtimeManager.getGasPtr(), llvm::UndefValue::get(Type::Gas), m_runtimeManager.getJmpBuf()});
-    //	}
-    //
-    //	m_blockCost += getStepCost(_inst);
-
-    fn count_fixed_instruction_cost(&self, inst_opcode: Opcode, exc_mgr: &ExceptionManager) {
+    fn count_fixed_instruction_cost(&mut self, inst_opcode: Opcode, exc_mgr: &ExceptionManager) {
         // If we have not generated a call to the gas check function for this block do it now
         if self.has_gas_check_call() == false {
             let types_instance = EvmTypes::get_instance(self.m_context);
@@ -207,7 +188,9 @@ impl<'a, P: Patch> InstructionGasCost for BasicBlockGasManager<'a, P> {
             let arg2 = types_instance.get_gas_type().get_undef();
             let arg3 = exc_mgr.get_exception_dest();
 
-            self.m_builder.build_call(self.m_gas_func, &[arg1.into(), arg2.into(), arg3.into()], "");
+            let gas_call = self.m_builder.build_call(self.m_gas_func, &[arg1.into(), arg2.into(), arg3.into()], "");
+            self.update_gas_check_call(gas_call);
+            assert!(self.has_gas_check_call());
         }
 
         let instruction_cost = FixedGasCostCalculator::<P>::gas_cost(inst_opcode);
@@ -241,5 +224,20 @@ impl<'a, P: Patch> InstructionGasCost for BasicBlockGasManager<'a, P> {
 
 }
 
+impl<'a, P: Patch> BasicBlockGasCost for BasicBlockGasManager<'a, P> {
+    fn finalize_block_cost(&mut self) {
+        if self.has_gas_check_call() {
+            if self.get_block_gas_cost() == 0 {
+                let inst = self.m_gas_check_call.borrow().unwrap().try_as_basic_value().right().unwrap();
+                assert!(inst.get_parent().is_some());
+                inst.erase_from_basic_block();
+            }
+            else {
+                self.reset_gas_check_call();
+                self.update_block_gas_cost(0);
+            }
+        }
+    }
+}
 
 //impl InstructionGasCost for BasicBlockManager
