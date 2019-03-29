@@ -256,6 +256,7 @@ impl ValidTransaction {
                 Ok(Context {
                     address,
                     caller: self.caller.unwrap_or(system_address!()),
+                    callee: address,
                     data: self.input,
                     gas_price: self.gas_price,
                     value: self.value,
@@ -277,6 +278,7 @@ impl ValidTransaction {
                 Ok(Context {
                     address,
                     caller: self.caller.unwrap_or(system_address!()),
+                    callee: address,
                     gas_price: self.gas_price,
                     value: self.value,
                     gas_limit: new_gas_limit,

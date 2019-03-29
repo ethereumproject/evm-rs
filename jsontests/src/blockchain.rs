@@ -267,6 +267,7 @@ pub fn create_context(v: &Value) -> Context {
     Context {
         address,
         caller,
+        callee: address,
         code: Rc::new(code),
         data: Rc::new(data),
         gas_limit,
