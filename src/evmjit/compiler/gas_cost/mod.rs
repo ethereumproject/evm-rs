@@ -25,9 +25,11 @@ use evmjit::compiler::evmconstants::EvmConstants;
 use evmjit::compiler::exceptions::ExceptionManager;
 use self::fixed_gas_cost::FixedGasCostCalculator;
 use self::variable_gas_cost::VariableGasCostCalculator;
+use evmjit::compiler::intrinsics::LLVMIntrinsic;
+use evmjit::compiler::intrinsics::LLVMIntrinsicManager;
 
 pub trait InstructionGasCost {
-    fn count_fixed_instruction_cost(&self, inst_opcode: Opcode, exc_mgr: &ExceptionManager) ;
+    fn count_fixed_instruction_cost(&mut self, inst_opcode: Opcode, exc_mgr: &ExceptionManager) ;
 
 
     // Variable cost methods
@@ -39,28 +41,12 @@ pub trait InstructionGasCost {
     //fn refund_gas(&self, gas_to_refund: IntValue);
 }
 
-
-pub trait BasicBlockGasCost: InstructionGasCost {
-    fn finalize_block_cost(&self);
-}
-
-
-pub struct BasicBlockGasManager<'a, P: Patch> {
-    m_context: &'a Context,
-    m_builder: &'a Builder,
-    m_runtime: &'a RuntimeManager<'a>,
-    m_variable_cost: VariableGasCostCalculator<'a, P>,
-    m_block_gas_cost: Cell<i64>,
-    m_gas_check_call: RefCell<Option<CallSiteValue>>,
+pub struct GasCheckFunctionCreator {
     m_gas_func: FunctionValue
 }
 
-
-impl<'a, P: Patch> BasicBlockGasManager<'a, P> {
-    pub fn new(context: &'a Context, builder: &'a Builder, module: &'a Module,
-               runtime: &'a RuntimeManager<'a>) -> BasicBlockGasManager<'a, P> {
-
-        let variable_cost_calculator: VariableGasCostCalculator<P> = VariableGasCostCalculator::new(&context, &builder, &module);
+impl GasCheckFunctionCreator {
+    pub fn new(name : &str, context: &Context, _builder: &Builder, module: &Module) -> GasCheckFunctionCreator {
         let types_instance = EvmTypes::get_instance(context);
 
         let gas_func_ret_type = context.void_type();
@@ -75,7 +61,7 @@ impl<'a, P: Patch> BasicBlockGasManager<'a, P> {
         let arg3 = types_instance.get_byte_ptr_type();
 
         let gas_func_type = gas_func_ret_type.fn_type(&[arg1.into(), arg2.into(), arg3.into()], false);
-        let gas_func = module.add_function("gas.check", gas_func_type, Some(Internal));
+        let gas_func = module.add_function(name, gas_func_type, Some(Internal));
 
         let attr_factory = LLVMAttributeFactory::get_instance(&context);
         gas_func.add_attribute(0, *attr_factory.attr_nounwind());
@@ -114,8 +100,43 @@ impl<'a, P: Patch> BasicBlockGasManager<'a, P> {
         gas_func_builder.build_return(None);
 
         gas_func_builder.position_at_end(&out_of_gas_bb);
-        runtime.abort(jmp_buf.into_pointer_value());
+
+        let func_decl = LLVMIntrinsic::LongJmp.get_intrinsic_declaration(&context,
+                                                                         &module,
+                                                                         None);
+
+        gas_func_builder.build_call (func_decl, &[jmp_buf.into_pointer_value().into()], "longJmp");
+
+        //runtime.abort(jmp_buf.into_pointer_value());
         gas_func_builder.build_unreachable();
+
+        GasCheckFunctionCreator {
+            m_gas_func: gas_func
+        }
+    }
+
+    pub fn get_gas_check_func_decl(&self) -> FunctionValue {
+        self.m_gas_func
+    }
+}
+
+pub struct BasicBlockGasManager<'a, P: Patch> {
+    m_context: &'a Context,
+    m_builder: &'a Builder,
+    m_runtime: &'a RuntimeManager<'a>,
+    m_variable_cost: VariableGasCostCalculator<'a, P>,
+    m_block_gas_cost: Cell<i64>,
+    m_gas_check_call: RefCell<Option<CallSiteValue>>,
+    m_gas_check_creator: GasCheckFunctionCreator
+}
+
+
+impl<'a, P: Patch> BasicBlockGasManager<'a, P> {
+    pub fn new(context: &'a Context, builder: &'a Builder, module: &'a Module,
+               runtime: &'a RuntimeManager<'a>) -> BasicBlockGasManager<'a, P> {
+
+        let variable_cost_calculator: VariableGasCostCalculator<P> = VariableGasCostCalculator::new(&context, &builder, &module);
+        let func_creator = GasCheckFunctionCreator::new("gas.check", &context, &builder, &module);
 
         BasicBlockGasManager {
             m_context: context,
@@ -124,7 +145,7 @@ impl<'a, P: Patch> BasicBlockGasManager<'a, P> {
             m_variable_cost: variable_cost_calculator,
             m_block_gas_cost: Cell::new(0),
             m_gas_check_call: RefCell::new(None),
-            m_gas_func: gas_func
+            m_gas_check_creator: func_creator
         }
     }
 
@@ -145,11 +166,11 @@ impl<'a, P: Patch> BasicBlockGasManager<'a, P> {
 
 
             let arg2 = cost_to_use;
-            self.m_builder.build_call(self.m_gas_func, &[arg1.into(), arg2.into(), arg3.into()], "");
+            self.m_builder.build_call(self.m_gas_check_creator.get_gas_check_func_decl(), &[arg1.into(), arg2.into(), arg3.into()], "");
         }
         else {
             assert!(cost.get_type() == types_instance.get_gas_type());
-            self.m_builder.build_call(self.m_gas_func, &[arg1.into(), cost.into(), arg3.into()], "");
+            self.m_builder.build_call(self.m_gas_check_creator.get_gas_check_func_decl(), &[arg1.into(), cost.into(), arg3.into()], "");
         }
     }
 
@@ -169,12 +190,40 @@ impl<'a, P: Patch> BasicBlockGasManager<'a, P> {
         self.m_gas_check_call.borrow()
     }
 
-    pub fn update_gas_check_call(&mut self, callsite: CallSiteValue) {
+    pub fn update_gas_check_call(&self, callsite: CallSiteValue) {
         *self.m_gas_check_call.borrow_mut() = Some(callsite);
     }
 
-    pub fn reset_gas_check_call(&mut self) {
+    pub fn reset_gas_check_call(&self) {
         *self.m_gas_check_call.borrow_mut() = None;
+    }
+
+    pub fn finalize_block_cost(&self) {
+        if self.has_gas_check_call() {
+            if self.get_block_gas_cost() == 0 {
+
+                if let Some(ref mock_call_site) = *self.m_gas_check_call.borrow() {
+                    let inst = mock_call_site.try_as_basic_value().right().unwrap();
+                    assert!(inst.get_parent().is_some());
+                    inst.erase_from_basic_block();
+                }
+
+                self.reset_gas_check_call();
+            }
+            else {
+                let types_instance = EvmTypes::get_instance(self.m_context);
+                let val = types_instance.get_gas_type().const_int(self.get_block_gas_cost() as u64, false);
+
+                // Update mocked gas check call with calculated gas of basic block
+
+                if let Some(ref mut mock_call_site) = *self.m_gas_check_call.borrow_mut() {
+                    mock_call_site.try_as_basic_value().right().unwrap().set_operand(1, val);
+                }
+
+                self.reset_gas_check_call();
+                self.update_block_gas_cost(0);
+            }
+        }
     }
 }
 
@@ -188,7 +237,8 @@ impl<'a, P: Patch> InstructionGasCost for BasicBlockGasManager<'a, P> {
             let arg2 = types_instance.get_gas_type().get_undef();
             let arg3 = exc_mgr.get_exception_dest();
 
-            let gas_call = self.m_builder.build_call(self.m_gas_func, &[arg1.into(), arg2.into(), arg3.into()], "");
+            let gas_call = self.m_builder.build_call(self.m_gas_check_creator.get_gas_check_func_decl(),
+                                                            &[arg1.into(), arg2.into(), arg3.into()], "");
             self.update_gas_check_call(gas_call);
             assert!(self.has_gas_check_call());
         }
@@ -215,7 +265,6 @@ impl<'a, P: Patch> InstructionGasCost for BasicBlockGasManager<'a, P> {
     }
 
     fn count_exp_cost(&self, exponent: IntValue, exc_mgr: &ExceptionManager) {
-        // pub fn exp_cost(&self, current_block: &BasicBlock, exponent: IntValue)
         assert!(self.m_builder.get_insert_block() != None);
         let current_block = self.m_builder.get_insert_block().unwrap();
         let cost = self.m_variable_cost.exp_cost(&current_block, exponent);
@@ -224,20 +273,3 @@ impl<'a, P: Patch> InstructionGasCost for BasicBlockGasManager<'a, P> {
 
 }
 
-impl<'a, P: Patch> BasicBlockGasCost for BasicBlockGasManager<'a, P> {
-    fn finalize_block_cost(&mut self) {
-        if self.has_gas_check_call() {
-            if self.get_block_gas_cost() == 0 {
-                let inst = self.m_gas_check_call.borrow().unwrap().try_as_basic_value().right().unwrap();
-                assert!(inst.get_parent().is_some());
-                inst.erase_from_basic_block();
-            }
-            else {
-                self.reset_gas_check_call();
-                self.update_block_gas_cost(0);
-            }
-        }
-    }
-}
-
-//impl InstructionGasCost for BasicBlockManager
