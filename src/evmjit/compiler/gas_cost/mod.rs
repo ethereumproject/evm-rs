@@ -52,8 +52,8 @@ impl GasCheckFunctionCreator {
         let gas_func_ret_type = context.void_type();
 
         // Set up gas check function arguments:
-        // Arg1 is pointer to gas type
-        // Arg2 is gas type
+        // Arg1 is pointer to gas type (Pointer to current gas)
+        // Arg2 is gas type (gas cost)
         // Arg3 is pointer type (buffer containing address to jump to in case we run out of gas
 
         let arg1 = types_instance.get_gas_ptr_type();
@@ -74,12 +74,15 @@ impl GasCheckFunctionCreator {
         let temp_builder = context.create_builder();
         temp_builder.position_at_end(&check_bb);
 
+        assert!(gas_func.get_nth_param(0) != None);
         let gas_ptr = gas_func.get_nth_param(0).unwrap();
         gas_ptr.into_pointer_value().set_name("gasPtr");
 
+        assert!(gas_func.get_nth_param(1) != None);
         let gas_cost = gas_func.get_nth_param(1).unwrap();
-        gas_cost.into_pointer_value().set_name("cost");
+        gas_cost.into_int_value().set_name("cost");
 
+        assert!(gas_func.get_nth_param(2) != None);
         let jmp_buf = gas_func.get_nth_param(2).unwrap();
         jmp_buf.into_pointer_value().set_name("jmpBuf");
 
@@ -101,13 +104,15 @@ impl GasCheckFunctionCreator {
 
         gas_func_builder.position_at_end(&out_of_gas_bb);
 
+        // If we enter this basic block, we ran out ouf gas.
+        // Use longjmp to trigger an exception
+
         let func_decl = LLVMIntrinsic::LongJmp.get_intrinsic_declaration(&context,
                                                                          &module,
                                                                          None);
 
         gas_func_builder.build_call (func_decl, &[jmp_buf.into_pointer_value().into()], "longJmp");
 
-        //runtime.abort(jmp_buf.into_pointer_value());
         gas_func_builder.build_unreachable();
 
         GasCheckFunctionCreator {
@@ -271,5 +276,161 @@ impl<'a, P: Patch> InstructionGasCost for BasicBlockGasManager<'a, P> {
         self.count_variable_cost(cost, exc_mgr);
     }
 
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use evmjit::compiler::evm_compiler::MainFuncCreator;
+    use inkwell::attributes::Attribute;
+    use inkwell::module::Linkage;
+    use std::ffi::CString;
+    use inkwell::values::InstructionOpcode;
+    use evmjit::{GetOperandValue, BasicTypeEnumCompare};
+    use evmjit::GetOperandBasicBlock;
+
+    #[test]
+    fn test_gas_check_func_creator() {
+        let context = Context::create();
+        let module = context.create_module("my_module");
+        let builder = context.create_builder();
+
+        let attr_factory = LLVMAttributeFactory::get_instance(&context);
+
+        // Generate outline of main function needed by 'RuntimeTypeManager
+        MainFuncCreator::new("main", &context, &builder, &module);
+
+        //let manager = RuntimeManager::new("main", &context, &builder, &module);
+        let _manager = RuntimeManager::new(&context, &builder, &module);
+
+        GasCheckFunctionCreator::new("gas.check", &context, &builder, &module);
+
+        //module.print_to_stderr();
+
+        let gas_check_fn_optional = module.get_function ("gas.check");
+        assert!(gas_check_fn_optional != None);
+        let gas_check_func = gas_check_fn_optional.unwrap();
+        assert_eq!(gas_check_func.count_params(), 3);
+        assert_eq!(gas_check_func.count_basic_blocks(), 3);
+        assert_eq!(gas_check_func.get_linkage(), Linkage::Internal);
+
+        // Verify gas function has nounwind and nocapture attributes
+        assert_eq!(gas_check_func.count_attributes(0), 2);
+        let nounwind_attr = gas_check_func.get_enum_attribute(0, Attribute::get_named_enum_kind_id("nounwind"));
+        assert!(nounwind_attr != None);
+
+        let nocapture_attr = gas_check_func.get_enum_attribute(0, Attribute::get_named_enum_kind_id("nocapture"));
+        assert!(nocapture_attr != None);
+
+        assert_eq!(nounwind_attr.unwrap(), *attr_factory.attr_nounwind());
+        assert_eq!(nocapture_attr.unwrap(), *attr_factory.attr_nocapture());
+
+        let entry_block_optional = gas_check_func.get_first_basic_block();
+        assert!(entry_block_optional != None);
+        let entry_block = entry_block_optional.unwrap();
+        assert_eq!(*entry_block.get_name(), *CString::new("Check").unwrap());
+
+        assert!(entry_block.get_first_instruction() != None);
+        let first_insn = entry_block.get_first_instruction().unwrap();
+        assert_eq!(first_insn.get_opcode(), InstructionOpcode::Load);
+
+        let load_operand0 = first_insn.get_operand_value(0).unwrap();
+        assert!(load_operand0.is_pointer_value());
+
+        let load_operand0_ptr_elt_t = load_operand0.into_pointer_value().get_type().get_element_type();
+        assert!(load_operand0_ptr_elt_t.is_int_type());
+        assert!(load_operand0_ptr_elt_t.into_int_type().get_bit_width() == 64);
+        assert!(first_insn.get_next_instruction() != None);
+        let second_insn = first_insn.get_next_instruction().unwrap();
+        assert_eq!(second_insn.get_opcode(), InstructionOpcode::Sub);
+        assert_eq!(second_insn.get_num_operands(), 2);
+
+        let sub_operand0 = second_insn.get_operand_value(0).unwrap();
+        assert!(sub_operand0.is_int_value());
+        assert!(sub_operand0.get_type().is_int64());
+
+        // Verify that gas loaded from memory is first operand of subtract
+        let gas_val_use = first_insn.get_first_use().unwrap().get_used_value().left().unwrap();
+        assert_eq!(sub_operand0, gas_val_use);
+
+        let sub_operand1 = second_insn.get_operand_value(1).unwrap();
+        assert!(sub_operand1.is_int_value());
+        assert!(sub_operand1.get_type().is_int64());
+
+        // Verify that the second operand of the subtract is the cost
+        let cost_arg = gas_check_func.get_nth_param(1).unwrap();
+        assert_eq! (cost_arg, sub_operand1);
+
+        assert!(second_insn.get_next_instruction() != None);
+        let third_insn = second_insn.get_next_instruction().unwrap();
+        assert_eq!(third_insn.get_opcode(), InstructionOpcode::ICmp);
+        assert_eq!(third_insn.get_num_operands(), 2);
+
+        let icmp_operand0 = third_insn.get_operand_value(0).unwrap();
+        let updated_gas_val = second_insn.get_first_use().unwrap().get_used_value().left().unwrap();
+        assert_eq!(icmp_operand0, updated_gas_val);
+
+        let icmp_operand1 = third_insn.get_operand_value(1).unwrap();
+        assert_eq!(icmp_operand1, context.i64_type().const_zero());
+
+        assert!(third_insn.get_next_instruction() != None);
+        let fourth_insn = third_insn.get_next_instruction().unwrap();
+        assert_eq!(fourth_insn.get_opcode(), InstructionOpcode::Br);
+        assert_eq!(fourth_insn.get_num_operands(), 3);
+
+        let cond_br_operand0 = fourth_insn.get_operand_value(0).unwrap();
+        let icmp_val_use = third_insn.get_first_use().unwrap().get_used_value().left().unwrap();
+        assert_eq!(icmp_val_use, cond_br_operand0);
+        //let cond_br_operand1 = fourth_insn.get_operand_as_bb(1).unwrap();
+        assert!(entry_block.get_next_basic_block() != None);
+
+        let update_block = entry_block.get_next_basic_block().unwrap();
+        assert_eq!(*update_block.get_name(), *CString::new("Update").unwrap());
+
+        let out_of_gas_block = update_block.get_next_basic_block().unwrap();
+        assert_eq!(*out_of_gas_block.get_name(), *CString::new("OutOfGas").unwrap());
+
+        // Why do the operands come back in the opposite order
+        let cond_br_operand1 = fourth_insn.get_operand_as_bb(1).unwrap();
+        assert_eq!(cond_br_operand1, out_of_gas_block);
+
+        let cond_br_operand2 = fourth_insn.get_operand_as_bb(2).unwrap();
+        assert_eq!(cond_br_operand2, update_block);
+
+        assert!(fourth_insn.get_next_instruction().is_none());
+
+        let first_update_insn = update_block.get_first_instruction().unwrap();
+        assert_eq!(first_update_insn.get_opcode(), InstructionOpcode::Store);
+        assert_eq!(first_update_insn.get_num_operands(), 2);
+        let store_operand0 = first_update_insn.get_operand_value(0).unwrap();
+        assert_eq!(store_operand0, updated_gas_val);
+
+        // Verify that the second operand of the subtract is the cost
+        let gas_ptr_arg = gas_check_func.get_nth_param(0).unwrap();
+        let store_operand1 = first_update_insn.get_operand_value(1).unwrap();
+        assert_eq!(store_operand1, gas_ptr_arg);
+
+        assert!(first_update_insn.get_next_instruction() != None);
+        let second_update_insn = first_update_insn.get_next_instruction().unwrap();
+        assert_eq!(second_update_insn.get_opcode(), InstructionOpcode::Return);
+        assert_eq!(second_update_insn.get_num_operands(), 0);
+        assert!(second_update_insn.get_next_instruction().is_none());
+
+        let first_out_of_gas_block_insn = out_of_gas_block.get_first_instruction().unwrap();
+        assert_eq!(first_out_of_gas_block_insn.get_opcode(), InstructionOpcode::Call);
+        assert_eq!(first_out_of_gas_block_insn.get_num_operands(), 2);
+
+        let first_out_of_gas_insn_operand0 = first_out_of_gas_block_insn.get_operand_value(0).unwrap();
+        assert!(first_out_of_gas_insn_operand0.is_pointer_value());
+        let first_out_of_gas_insn_operand0_ptr_elt_t = first_out_of_gas_insn_operand0.into_pointer_value().get_type().get_element_type();
+        assert!(first_out_of_gas_insn_operand0_ptr_elt_t.is_int_type());
+        assert_eq!(first_out_of_gas_insn_operand0_ptr_elt_t.into_int_type(), context.i8_type());
+
+
+        assert!(first_out_of_gas_block_insn.get_next_instruction().is_some());
+        let second_out_of_gas_block_insn = first_out_of_gas_block_insn.get_next_instruction().unwrap();
+        assert_eq!(second_out_of_gas_block_insn.get_opcode(), InstructionOpcode::Unreachable);
+
+    }
 }
 
