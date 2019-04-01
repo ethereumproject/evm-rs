@@ -212,7 +212,6 @@ mod tests {
     use inkwell::module::Module;
     use inkwell::builder::Builder;
     use inkwell::types::BasicTypeEnum;
-    use bigint::Gas;
     use inkwell::execution_engine::{ExecutionEngine, JitFunction, FunctionLookupError};
     use inkwell::OptimizationLevel;
     use evmjit::compiler::evm_compiler::MainFuncCreator;
