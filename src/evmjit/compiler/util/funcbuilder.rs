@@ -1,5 +1,4 @@
 /// Builder API for ergonomic function building.
-
 use std::error::Error;
 use std::fmt;
 
@@ -32,7 +31,7 @@ impl<'a> FunctionTypeBuilder<'a> {
         }
     }
     
-    /// Consume the builder and return an LLVM function signature..
+    /// Consume the builder and return an LLVM function signature.
     pub fn build(self) -> Result<FunctionType, FunctionTypeBuilderError> {
         // Arguments don't need validation because BasicTypeEnum doesn't include any
         // non-first-class types.

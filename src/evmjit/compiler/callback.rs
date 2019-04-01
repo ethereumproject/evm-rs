@@ -5,12 +5,8 @@ use evmjit::compiler::util::funcbuilder::*;
 use inkwell::context::Context;
 use inkwell::builder::Builder;
 use inkwell::module::Module;
-//use inkwell::values::FunctionValue;
 use inkwell::types::FunctionType;
 use singletonum::{Singleton, SingletonInit};
-
-//#[cfg(feature = "std")] use std::collections::HashMap as Map;
-//#[cfg(not(feature = "std"))] use alloc::collections::btree_map::BTreeMap as Map;
 
 /// Structure handling JIT callback interface. 
 /// CallbackInterfaceManager is responsible for handling linkage needed for EVM opcodes that
