@@ -79,6 +79,10 @@ impl GetOperandBasicBlock for InstructionValue {
     }
 }
 
+pub trait FindBasicBlock {
+    fn find_bb(&self, name : &str) -> Option<BasicBlock>;
+}
+
 pub trait BasicTypeEnumCompare {
     fn is_int_t(self) -> bool;
     fn is_int1(self) -> bool;
