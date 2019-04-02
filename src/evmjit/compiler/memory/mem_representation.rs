@@ -27,9 +27,11 @@ impl SingletonInit for MemoryRepresentationType {
     type Init = Context;
     fn init(context: &Context) -> Self {
         let evm_word_t = context.custom_width_int_type(256);
+        let evm_word_ptr_t = evm_word_t.ptr_type(AddressSpace::Generic);
+
         let size_t = context.i64_type();
 
-        let fields = [evm_word_t.into(),
+        let fields = [evm_word_ptr_t.into(),
                       size_t.into(),
                       size_t.into()];
 
@@ -74,7 +76,7 @@ impl MemoryRepresentationType {
         }
 
         let field1 = a_struct.get_field_type_at_index(0).unwrap();
-        if !field1.is_int256() {
+        if !field1.is_ptr_to_int256() {
             return false;
         }
 
@@ -150,9 +152,10 @@ fn test_memory_representation_type() {
     assert!(MemoryRepresentationType::is_mem_representation_type (mem_struct_ptr.get_element_type().as_struct_type()));
 
     let evm_word_t = context.custom_width_int_type(256);
+    let evm_word_ptr_t = evm_word_t.ptr_type(AddressSpace::Generic);
     let size_t = context.i64_type();
 
-    let fields = [evm_word_t.into(),
+    let fields = [evm_word_ptr_t.into(),
                   size_t.into(),
                   context.i32_type().into()];
 
