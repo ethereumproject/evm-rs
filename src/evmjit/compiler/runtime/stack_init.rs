@@ -70,20 +70,6 @@ mod tests {
         let malloc_func_optional = module.get_function("malloc");
         assert!(malloc_func_optional != None);
 
-        /*
-        let malloc_func = malloc_func_optional.unwrap();
-        assert!(malloc_func.get_linkage() == External);
-
-        let nounwind_attr = malloc_func.get_enum_attribute(0, Attribute::get_named_enum_kind_id("nounwind"));
-        assert!(nounwind_attr != None);
-
-        let noalias_attr = malloc_func.get_enum_attribute(0, Attribute::get_named_enum_kind_id("noalias"));
-        assert!(noalias_attr != None);
-
-        assert_eq!(nounwind_attr.unwrap(), *attr_factory.attr_nounwind());
-        assert_eq!(noalias_attr.unwrap(), *attr_factory.attr_noalias());
-        */
-
         let entry_block_optional = my_fn.get_first_basic_block();
         assert!(entry_block_optional != None);
         let entry_block = entry_block_optional.unwrap();

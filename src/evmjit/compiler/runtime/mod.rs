@@ -136,24 +136,6 @@ impl MainPrologue {
 
         let free_func = decl_factory.get_free_decl();
 
-        //let free_func_opt = module.get_function("free");
-
-        //let free_func: FunctionValue;
-
-        /* if free_func_opt == None {
-            let free_ret_type = context.void_type();
-            let arg1 = types_instance.get_word_ptr_type();
-            let free_func_type = free_ret_type.fn_type(&[arg1.into()], false);
-            free_func = module.add_function("free", free_func_type, Some(External));
-
-            let attr_factory = LLVMAttributeFactory::get_instance(&context);
-            free_func.add_attribute(0, *attr_factory.attr_nounwind());
-            free_func.add_attribute(0, *attr_factory.attr_nocapture());
-        } else {
-            free_func = free_func_opt.unwrap();
-        }
-        */
-
         temp_builder.build_call(free_func, &[stack_base.into()], "");
         let index = Gas.to_index() as u32;
         unsafe {
