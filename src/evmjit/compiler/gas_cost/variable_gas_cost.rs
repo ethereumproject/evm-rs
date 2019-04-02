@@ -217,6 +217,7 @@ mod tests {
     use evmjit::compiler::evm_compiler::MainFuncCreator;
     use evmjit::compiler::runtime::RuntimeManager;
     use patch::EmbeddedPatch;
+    use evmjit::compiler::external_declarations::ExternalFunctionManager;
 
     type Log2Func = unsafe extern "C" fn(u64) -> u64;
 
@@ -276,11 +277,12 @@ mod tests {
         //let word_type = types_instance.get_word_type();
         //let enum_word_type = BasicTypeEnum::IntType(word_type);
         let builder = context.create_builder();
+        let decl_factory = ExternalFunctionManager::new(&context, &module);
 
         // Need to create main function before TransactionConextManager otherwise we will crash
         let main_func = MainFuncCreator::new ("main", &context, &builder, &module);
 
-        let _manager = RuntimeManager::new(&context, &builder, &module);
+        let _manager = RuntimeManager::new(&context, &builder, &module, &decl_factory);
         let entry_bb = main_func.get_entry_bb();
 
         builder.position_at_end(&entry_bb);
@@ -289,7 +291,7 @@ mod tests {
 
         let exponent = context.custom_width_int_type(256).const_int(55, false);
         gas_calculator.exp_cost(entry_bb, exponent);
-        module.print_to_stderr();
+        //module.print_to_stderr();
     }
 
     #[test]
@@ -300,11 +302,12 @@ mod tests {
         //let word_type = types_instance.get_word_type();
         //let enum_word_type = BasicTypeEnum::IntType(word_type);
         let builder = context.create_builder();
+        let decl_factory = ExternalFunctionManager::new(&context, &module);
 
         // Need to create main function before TransactionConextManager otherwise we will crash
         let main_func = MainFuncCreator::new ("main", &context, &builder, &module);
 
-        let _manager = RuntimeManager::new(&context, &builder, &module);
+        let _manager = RuntimeManager::new(&context, &builder, &module, &decl_factory);
         let entry_bb = main_func.get_entry_bb();
 
         builder.position_at_end(&entry_bb);
@@ -313,7 +316,7 @@ mod tests {
 
         let log_data_length = context.custom_width_int_type(256).const_int(30, false);
         gas_calculator.log_data_cost(log_data_length);
-        module.print_to_stderr();
+        //module.print_to_stderr();
     }
 
     #[test]
@@ -324,11 +327,12 @@ mod tests {
         //let word_type = types_instance.get_word_type();
         //let enum_word_type = BasicTypeEnum::IntType(word_type);
         let builder = context.create_builder();
+        let decl_factory = ExternalFunctionManager::new(&context, &module);
 
         // Need to create main function before TransactionConextManager otherwise we will crash
         let main_func = MainFuncCreator::new ("main", &context, &builder, &module);
 
-        let _manager = RuntimeManager::new(&context, &builder, &module);
+        let _manager = RuntimeManager::new(&context, &builder, &module, &decl_factory);
         let entry_bb = main_func.get_entry_bb();
 
         builder.position_at_end(&entry_bb);
@@ -337,7 +341,7 @@ mod tests {
 
         let sha3_data_len = context.custom_width_int_type(256).const_int(19, false);
         gas_calculator.sha3_data_cost(sha3_data_len);
-        module.print_to_stderr();
+        //module.print_to_stderr();
     }
 
     #[test]
@@ -348,11 +352,12 @@ mod tests {
         //let word_type = types_instance.get_word_type();
         //let enum_word_type = BasicTypeEnum::IntType(word_type);
         let builder = context.create_builder();
+        let decl_factory = ExternalFunctionManager::new(&context, &module);
 
         // Need to create main function before TransactionConextManager otherwise we will crash
         let main_func = MainFuncCreator::new ("main", &context, &builder, &module);
 
-        let _manager = RuntimeManager::new(&context, &builder, &module);
+        let _manager = RuntimeManager::new(&context, &builder, &module, &decl_factory);
         let entry_bb = main_func.get_entry_bb();
 
         builder.position_at_end(&entry_bb);
@@ -361,7 +366,7 @@ mod tests {
 
         let copy_data_len = context.custom_width_int_type(256).const_int(157, false);
         gas_calculator.copy_data_cost(copy_data_len);
-        module.print_to_stderr();
+        //module.print_to_stderr();
     }
     
     #[test]

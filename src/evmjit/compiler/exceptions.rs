@@ -82,16 +82,18 @@ mod tests {
     use inkwell::values::BasicValue;
     use evmjit::GetOperandValue;
     use evmjit::GetOperandBasicBlock;
+    use evmjit::compiler::external_declarations::ExternalFunctionManager;
 
     #[test]
     fn test_exception_manager() {
         let context = Context::create();
         let module = context.create_module("my_module");
         let builder = context.create_builder();
+        let decl_factory = ExternalFunctionManager::new(&context, &module);
 
         // Generate outline of main function needed by 'RuntimeTypeManager
         let main_func = MainFuncCreator::new ("main", &context, &builder, &module);
-        let _runtime = RuntimeManager::new(&context, &builder, &module);
+        let _runtime = RuntimeManager::new(&context, &builder, &module, &decl_factory);
 
         let normal_path_block = main_func.get_entry_bb().get_next_basic_block();
         assert!(normal_path_block != None);
@@ -108,7 +110,7 @@ mod tests {
 
         let _exception_mgr = ExceptionManager::new(&context, &builder, &module, &normal_block, exception_block);
 
-        module.print_to_stderr();
+        //module.print_to_stderr();
 
         assert!(exception_handler_bb.get_first_instruction() != None);
 

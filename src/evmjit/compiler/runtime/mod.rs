@@ -15,7 +15,6 @@ use inkwell::values::BasicValueEnum;
 use inkwell::values::PointerValue;
 use inkwell::values::FunctionValue;
 use inkwell::basic_block::BasicBlock;
-use inkwell::module::Linkage::*;
 use singletonum::Singleton;
 use self::rt_data_type::RuntimeDataType;
 use self::rt_type::RuntimeType;
@@ -28,7 +27,7 @@ use evmjit::compiler::evmtypes::EvmTypes;
 use evmjit::compiler::evmconstants::EvmConstants;
 use llvm_sys::LLVMCallConv::*;
 use evmjit::ModuleLookup;
-use evmjit::LLVMAttributeFactory;
+use evmjit::compiler::external_declarations::ExternalFunctionManager;
 
 #[derive(PartialEq)]
 pub enum TransactionContextTypeFields {
@@ -126,20 +125,22 @@ struct MainPrologue {
 }
 
 impl MainPrologue {
-    pub fn new(context: &Context, module: &Module,
-               rt_type_mgr: &RuntimeTypeManager, gas_mgr: &GasPtrManager,
-               main_func: FunctionValue, stack_base: BasicValueEnum) -> MainPrologue {
+    pub fn new(context: &Context, rt_type_mgr: &RuntimeTypeManager, gas_mgr: &GasPtrManager,
+               main_func: FunctionValue, stack_base: BasicValueEnum, decl_factory: &ExternalFunctionManager) -> MainPrologue {
         let exit_bb = context.append_basic_block(&main_func, "Exit");
         let temp_builder = context.create_builder();
         temp_builder.position_at_end(&exit_bb);
 
         let types_instance = EvmTypes::get_instance(context);
         let phi = temp_builder.build_phi(types_instance.get_contract_return_type(), "ret");
-        let free_func_opt = module.get_function("free");
 
-        let free_func: FunctionValue;
+        let free_func = decl_factory.get_free_decl();
 
-        if free_func_opt == None {
+        //let free_func_opt = module.get_function("free");
+
+        //let free_func: FunctionValue;
+
+        /* if free_func_opt == None {
             let free_ret_type = context.void_type();
             let arg1 = types_instance.get_word_ptr_type();
             let free_func_type = free_ret_type.fn_type(&[arg1.into()], false);
@@ -151,6 +152,7 @@ impl MainPrologue {
         } else {
             free_func = free_func_opt.unwrap();
         }
+        */
 
         temp_builder.build_call(free_func, &[stack_base.into()], "");
         let index = Gas.to_index() as u32;
@@ -184,7 +186,7 @@ pub struct RuntimeManager<'a> {
 }
 
 impl<'a> RuntimeManager<'a> {
-    pub fn new(context: &'a Context, builder: &'a Builder, module: &'a Module) -> RuntimeManager<'a> {
+    pub fn new(context: &'a Context, builder: &'a Builder, module: &'a Module, decl_factory: &ExternalFunctionManager) -> RuntimeManager<'a> {
 
         let main_func_opt = module.get_main_function(builder);
         assert!(main_func_opt != None);
@@ -195,15 +197,16 @@ impl<'a> RuntimeManager<'a> {
         // Generate IR for runtime type related items
         let rt_type_manager = RuntimeTypeManager::new (&context, &builder, &module);
 
-        let stack_allocator = StackAllocator::new (&context, &builder, &module);
+        let stack_allocator = StackAllocator::new (&context, &builder, &decl_factory);
 
         let gas_ptr_mgr = GasPtrManager::new(context, builder, rt_type_manager.get_gas());
 
         let return_buf_mgr = ReturnBufferManager::new(context, builder);
         return_buf_mgr.reset_return_buf();
 
-        let prologue_manager = MainPrologue::new(context, module, &rt_type_manager, &gas_ptr_mgr,
-                                                 main_func_opt.unwrap(), stack_allocator.get_stack_base_as_ir_value());
+        let prologue_manager = MainPrologue::new(context, &rt_type_manager, &gas_ptr_mgr,
+                                                 main_func_opt.unwrap(), stack_allocator.get_stack_base_as_ir_value(),
+                                                    decl_factory);
 
         RuntimeManager {
             m_context: context,
@@ -285,7 +288,7 @@ impl<'a> RuntimeManager<'a> {
 }
 
 #[cfg(test)]
-mod tests {
+mod runtime_tests {
     use std::ffi::CString;
     use super::*;
     use inkwell::values::InstructionOpcode;
@@ -293,6 +296,7 @@ mod tests {
     use self::env::EnvDataType;
     use evmjit::compiler::evm_compiler::MainFuncCreator;
     use evmjit::GetOperandValue;
+    use inkwell::module::Linkage::External;
 
     #[test]
     fn test_data_field_to_index() {
@@ -310,12 +314,13 @@ mod tests {
         let context = Context::create();
         let module = context.create_module("my_module");
         let builder = context.create_builder();
+        let decl_factory = ExternalFunctionManager::new(&context, &module);
 
         // Generate outline of main function needed by 'RuntimeTypeManager
         MainFuncCreator::new ("main", &context, &builder, &module);
 
         //let manager = RuntimeManager::new("main", &context, &builder, &module);
-        let manager = RuntimeManager::new(&context, &builder, &module);
+        let manager = RuntimeManager::new(&context, &builder, &module, &decl_factory);
 
         assert!(RuntimeDataType::is_rt_data_type(&manager.get_runtime_data_type()));
         assert!(RuntimeType::is_runtime_type(&manager.get_runtime_type()));
@@ -330,12 +335,13 @@ mod tests {
         let context = Context::create();
         let module = context.create_module("my_module");
         let builder = context.create_builder();
+        let decl_factory = ExternalFunctionManager::new(&context, &module);
 
         // Generate outline of main function needed by 'RuntimeTypeManager
         MainFuncCreator::new ("main", &context, &builder, &module);
 
         // Generate IR for runtime type related items
-        let rt_type_manager = RuntimeTypeManager::new (&context, &builder, &module);
+        let rt_type_manager = RuntimeManager::new (&context, &builder, &module, &decl_factory);
 
         // Create dummy function
 
@@ -349,27 +355,33 @@ mod tests {
 
         GasPtrManager::new(&context, &builder, rt_type_manager.get_gas());
 
+        module.print_to_stderr();
+
         assert!(gas_bb.get_first_instruction() != None);
         let first_insn = gas_bb.get_first_instruction().unwrap();
-        assert_eq!(first_insn.get_opcode(), InstructionOpcode::Alloca);
+        assert_eq!(first_insn.get_opcode(), InstructionOpcode::Load);
 
         assert!(first_insn.get_next_instruction() != None);
         let second_insn = first_insn.get_next_instruction().unwrap();
-        assert_eq!(second_insn.get_opcode(), InstructionOpcode::Store);
-        assert_eq!(second_insn.get_num_operands(), 2);
+        assert_eq!(second_insn.get_opcode(), InstructionOpcode::Alloca);
 
-        let store_operand0 = second_insn.get_operand_value(0).unwrap();
+        assert!(second_insn.get_next_instruction() != None);
+        let third_insn = second_insn.get_next_instruction().unwrap();
+        assert_eq!(third_insn.get_opcode(), InstructionOpcode::Store);
+        assert_eq!(third_insn.get_num_operands(), 2);
+
+        let store_operand0 = third_insn.get_operand_value(0).unwrap();
         assert!(store_operand0.is_int_value());
         assert_eq!(store_operand0.get_type().as_int_type().get_bit_width(), 64);
 
-        let store_operand1 = second_insn.get_operand_value(1).unwrap();
+        let store_operand1 = third_insn.get_operand_value(1).unwrap();
         assert!(store_operand1.is_pointer_value());
         let store_operand1_ptr_elt_t = store_operand1.into_pointer_value().get_type().get_element_type();
 
         assert!(store_operand1_ptr_elt_t.is_int_type());
         assert_eq!(store_operand1_ptr_elt_t.as_int_type().get_bit_width(), 64);
 
-        assert!(second_insn.get_next_instruction() == None);
+        assert!(third_insn.get_next_instruction() == None);
     }
 
 
@@ -422,11 +434,12 @@ mod tests {
         let context = Context::create();
         let module = context.create_module("my_module");
         let builder = context.create_builder();
+        let decl_factory = ExternalFunctionManager::new(&context, &module);
 
         // Need to create main function before TransactionConextManager otherwise we will crash
         MainFuncCreator::new ("main", &context, &builder, &module);
 
-        let manager = RuntimeManager::new(&context, &builder, &module);
+        let manager = RuntimeManager::new(&context, &builder, &module, &decl_factory);
 
         let main_fn_optional = module.get_function ("main");
         assert!(main_fn_optional != None);
@@ -507,10 +520,11 @@ mod tests {
         let context = Context::create();
         let module = context.create_module("my_module");
         let builder = context.create_builder();
+        let decl_factory = ExternalFunctionManager::new(&context, &module);
 
         // Need to create main function before TransactionConextManager otherwise we will crash
         MainFuncCreator::new ("main", &context, &builder, &module);
-        let manager = RuntimeManager::new(&context, &builder, &module);
+        let manager = RuntimeManager::new(&context, &builder, &module, &decl_factory);
 
         let main_fn_optional = module.get_function ("main");
         assert!(main_fn_optional != None);
@@ -595,11 +609,12 @@ mod tests {
         let context = Context::create();
         let module = context.create_module("my_module");
         let builder = context.create_builder();
+        let decl_factory = ExternalFunctionManager::new(&context, &module);
 
         // Need to create main function before TransactionConextManager otherwise we will crash
         MainFuncCreator::new ("main", &context, &builder, &module);
 
-        let manager = RuntimeManager::new(&context, &builder, &module);
+        let manager = RuntimeManager::new(&context, &builder, &module, &decl_factory);
 
         let main_fn_optional = module.get_function ("main");
         assert!(main_fn_optional != None);
@@ -684,11 +699,12 @@ mod tests {
         let context = Context::create();
         let module = context.create_module("my_module");
         let builder = context.create_builder();
+        let decl_factory = ExternalFunctionManager::new(&context, &module);
 
         // Need to create main function before TransactionConextManager otherwise we will crash
         MainFuncCreator::new ("main", &context, &builder, &module);
 
-        let manager = RuntimeManager::new(&context, &builder, &module);
+        let manager = RuntimeManager::new(&context, &builder, &module, &decl_factory);
 
         let main_fn_optional = module.get_function ("main");
         assert!(main_fn_optional != None);
@@ -769,11 +785,12 @@ mod tests {
         let context = Context::create();
         let module = context.create_module("my_module");
         let builder = context.create_builder();
+        let decl_factory = ExternalFunctionManager::new(&context, &module);
 
         // Need to create main function before TransactionConextManager otherwise we will crash
         MainFuncCreator::new ("main", &context, &builder, &module);
 
-        let manager = RuntimeManager::new(&context, &builder, &module);
+        let manager = RuntimeManager::new(&context, &builder, &module, &decl_factory);
 
         let main_fn_optional = module.get_function ("main");
         assert!(main_fn_optional != None);
@@ -854,11 +871,12 @@ mod tests {
         let context = Context::create();
         let module = context.create_module("my_module");
         let builder = context.create_builder();
+        let decl_factory = ExternalFunctionManager::new(&context, &module);
 
         // Need to create main function before TransactionConextManager otherwise we will crash
         MainFuncCreator::new ("main", &context, &builder, &module);
 
-        let manager = RuntimeManager::new(&context, &builder, &module);
+        let manager = RuntimeManager::new(&context, &builder, &module, &decl_factory);
 
         let main_fn_optional = module.get_function ("main");
         assert!(main_fn_optional != None);
@@ -939,11 +957,12 @@ mod tests {
         let context = Context::create();
         let module = context.create_module("my_module");
         let builder = context.create_builder();
+        let decl_factory = ExternalFunctionManager::new(&context, &module);
 
         // Need to create main function before TransactionConextManager otherwise we will crash
         MainFuncCreator::new ("main", &context, &builder, &module);
 
-        let manager = RuntimeManager::new(&context, &builder, &module);
+        let manager = RuntimeManager::new(&context, &builder, &module, &decl_factory);
 
         let main_fn_optional = module.get_function ("main");
         assert!(main_fn_optional != None);

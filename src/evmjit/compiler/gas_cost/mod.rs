@@ -288,12 +288,14 @@ mod tests {
     use inkwell::values::InstructionOpcode;
     use evmjit::{GetOperandValue, BasicTypeEnumCompare};
     use evmjit::GetOperandBasicBlock;
+    use evmjit::compiler::external_declarations::ExternalFunctionManager;
 
     #[test]
     fn test_gas_check_func_creator() {
         let context = Context::create();
         let module = context.create_module("my_module");
         let builder = context.create_builder();
+        let decl_factory = ExternalFunctionManager::new(&context, &module);
 
         let attr_factory = LLVMAttributeFactory::get_instance(&context);
 
@@ -301,7 +303,7 @@ mod tests {
         MainFuncCreator::new("main", &context, &builder, &module);
 
         //let manager = RuntimeManager::new("main", &context, &builder, &module);
-        let _manager = RuntimeManager::new(&context, &builder, &module);
+        let _manager = RuntimeManager::new(&context, &builder, &module, &decl_factory);
 
         GasCheckFunctionCreator::new("gas.check", &context, &builder, &module);
 
