@@ -73,13 +73,6 @@ impl<'a> ExternalFunctionManager<'a> {
         }
     }
 
-    // llvm::Type* reallocArgTypes[] = {Type::BytePtr, Type::Size};
-    //	auto reallocFunc = llvm::Function::Create(llvm::FunctionType::get(Type::BytePtr, reallocArgTypes, false), llvm::Function::ExternalLinkage, "realloc", getModule());
-    //	reallocFunc->setDoesNotThrow();
-    //	reallocFunc->addAttribute(0, llvm::Attribute::NoAlias);
-    //	reallocFunc->addAttribute(1, llvm::Attribute::NoCapture);
-    //	return reallocFunc;
-
     pub fn get_realloc_decl(&self) -> FunctionValue {
         if self.realloc_decl.borrow().is_none() {
             let types_instance = EvmTypes::get_instance(self.m_context);
@@ -102,9 +95,7 @@ impl<'a> ExternalFunctionManager<'a> {
             let decl = self.realloc_decl.borrow().unwrap();
             decl
         }
-
     }
-
 }
 
 
