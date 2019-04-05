@@ -4,100 +4,162 @@ use evmjit::compiler::evmtypes::EvmTypes;
 use inkwell::context::Context;
 use inkwell::module::Module;
 use inkwell::values::FunctionValue;
+use inkwell::module::Linkage;
+use inkwell::types::FunctionType;
+use inkwell::attributes::Attribute;
 use evmjit::LLVMAttributeFactory;
 use std::cell::RefCell;
 use inkwell::module::Linkage::*;
 use singletonum::Singleton;
 
+#[cfg(feature = "std")] use std::collections::HashMap as Map;
+#[cfg(not(feature = "std"))] use alloc::collections::BTreeMap as Map;
+
+/// Function declaration description. Can be passed to ExternalFunctionManager.
+pub trait FuncDecl {
+    fn identifier(&self) -> String;
+    fn signature(&self) -> FunctionType;
+    fn attrs(&self) -> Vec<(u32, Attribute)>;
+    fn linkage(&self) -> Option<Linkage>;
+}
+
+// Stub structs for function declarations.
+pub struct MallocDecl<'a>(&'a Context);
+pub struct FreeDecl<'a>(&'a Context);
+pub struct ReallocDecl<'a>(&'a Context);
+
 pub struct ExternalFunctionManager<'a> {
     m_context: &'a Context,
     m_module: &'a Module,
-    malloc_decl: RefCell<Option<FunctionValue>>,
-    free_decl: RefCell<Option<FunctionValue>>,
-    realloc_decl: RefCell<Option<FunctionValue>>,
+    m_decls: RefCell<Map<String, FunctionValue>>,
 }
-
-
-
 
 impl<'a> ExternalFunctionManager<'a> {
     pub fn new(context: &'a Context, module: &'a Module) -> ExternalFunctionManager<'a> {
-        ExternalFunctionManager {
+        let ret = ExternalFunctionManager {
             m_context: context,
             m_module: module,
-            malloc_decl: RefCell::new(None),
-            free_decl: RefCell::new(None),
-            realloc_decl: RefCell::new(None),
-        }
+            m_decls: RefCell::new(Map::new()),
+        };
+
+        ret
     }
 
-    pub fn get_malloc_decl(&self) -> FunctionValue {
-        if self.malloc_decl.borrow().is_none() {
-            let types_instance = EvmTypes::get_instance(self.m_context);
-            let malloc_fn_type = types_instance.get_word_ptr_type().fn_type(&[types_instance.get_size_type().into()], false);
-
-            let malloc_func = self.m_module.add_function ("malloc", malloc_fn_type, Some(External));
-            let attr_factory = LLVMAttributeFactory::get_instance(&self.m_context);
-
-            malloc_func.add_attribute(0, *attr_factory.attr_nounwind());
-            malloc_func.add_attribute(0, *attr_factory.attr_noalias());
-
-            *self.malloc_decl.borrow_mut() = Some(malloc_func);
-            malloc_func
-        }
-        else {
-            let decl = self.malloc_decl.borrow().unwrap();
-            decl
-        }
-
+    pub fn get_decl<T>(&self, id: T) -> Option<FunctionValue>
+        where T: Into<String>
+    {
+         if let Some(decl) = self.m_decls.borrow().get(&id.into()) {
+             Some(decl.clone())
+         } else {
+             None
+         }
     }
 
-    pub fn get_free_decl(&self) -> FunctionValue {
-        if self.free_decl.borrow().is_none() {
-            let types_instance = EvmTypes::get_instance(self.m_context);
-            let free_ret_type = self.m_context.void_type();
-            let arg1 = types_instance.get_word_ptr_type();
-            let free_func_type = free_ret_type.fn_type(&[arg1.into()], false);
-            let free_func = self.m_module.add_function("free", free_func_type, Some(External));
+    pub fn add_decl<T>(&self, decl: T) -> FunctionValue 
+        where T: FuncDecl 
+    {
+        let ret = self.m_module.add_function(decl.identifier().as_str(), decl.signature(), decl.linkage());
 
-            let attr_factory = LLVMAttributeFactory::get_instance(&self.m_context);
-            free_func.add_attribute(0, *attr_factory.attr_nounwind());
-            free_func.add_attribute(1, *attr_factory.attr_nocapture());
-
-            *self.free_decl.borrow_mut() = Some(free_func);
-            free_func
+        for (idx, attr) in decl.attrs().iter() {
+            ret.add_attribute(*idx, *attr);
         }
-        else {
-            let decl = self.free_decl.borrow().unwrap();
-            decl
-        }
-    }
 
-    pub fn get_realloc_decl(&self) -> FunctionValue {
-        if self.realloc_decl.borrow().is_none() {
-            let types_instance = EvmTypes::get_instance(self.m_context);
-            let realloc_return_type = types_instance.get_byte_ptr_type();
-            let arg1 = types_instance.get_byte_ptr_type();
-            let arg2 = types_instance.get_size_type();
-            let realloc_func_type = realloc_return_type.fn_type(&[arg1.into(), arg2.into()], false);
+        self.m_decls.borrow_mut().insert(decl.identifier(), ret);
 
-            let realloc_func = self.m_module.add_function("realloc", realloc_func_type, Some(External));
-
-            let attr_factory = LLVMAttributeFactory::get_instance(&self.m_context);
-            realloc_func.add_attribute(0, *attr_factory.attr_noalias());
-            realloc_func.add_attribute(0, *attr_factory.attr_nounwind());
-            realloc_func.add_attribute(1, *attr_factory.attr_nocapture());
-            *self.realloc_decl.borrow_mut() = Some(realloc_func);
-            realloc_func
-
-        }
-        else {
-            let decl = self.realloc_decl.borrow().unwrap();
-            decl
-        }
+        ret
     }
 }
 
+impl<'a> MallocDecl<'a> {
+    pub fn new(context: &'a Context) -> Self {
+        MallocDecl(context)
+    }
+}
+
+impl<'a> FreeDecl<'a> {
+    pub fn new(context: &'a Context) -> Self {
+        FreeDecl(context)
+    }
+}
+
+impl<'a> ReallocDecl<'a> {
+    pub fn new(context: &'a Context) -> Self {
+        ReallocDecl(context)
+    }
+}
+
+impl<'a> FuncDecl for MallocDecl<'a> {
+    fn identifier(&self) -> String {
+        "malloc".to_string()
+    }
+
+    fn signature(&self) -> FunctionType {
+        // TODO: Update for function type builder api when merged
+        let types_instance = EvmTypes::get_instance(self.0);
+        types_instance.get_word_ptr_type().fn_type(&[types_instance.get_size_type().into()], false)
+    }
+
+    fn attrs(&self) -> Vec<(u32, Attribute)> {
+        let attr_factory = LLVMAttributeFactory::get_instance(&self.0);
+        vec![
+            (0, *attr_factory.attr_nounwind()),
+            (0, *attr_factory.attr_noalias()),
+        ]
+    }
+
+    fn linkage(&self) -> Option<Linkage> {
+        Some(External)
+    }
+}
+
+impl<'a> FuncDecl for FreeDecl<'a> {
+    fn identifier(&self) -> String {
+        "free".to_string()
+    }
+
+    fn signature(&self) -> FunctionType { 
+        // TODO: Update for function type builder api when merged
+        let types_instance = EvmTypes::get_instance(self.0);
+        types_instance.get_void_type().fn_type(&[types_instance.get_word_ptr_type().into()], false)
+    }
+
+    fn attrs(&self) -> Vec<(u32, Attribute)> {
+        let attr_factory = LLVMAttributeFactory::get_instance(&self.0);
+        vec![
+            (0, *attr_factory.attr_nounwind()),
+            (1, *attr_factory.attr_nocapture()),
+        ]
+    }
+
+    fn linkage(&self) -> Option<Linkage> {
+        Some(External)
+    }
+}
+
+impl<'a> FuncDecl for ReallocDecl<'a> {
+    fn identifier(&self) -> String {
+        "realloc".to_string()
+    }
+
+    fn signature(&self) -> FunctionType {
+        // TODO: Update for function type builder api when merged
+        let types_instance = EvmTypes::get_instance(self.0);
+        types_instance.get_byte_ptr_type().fn_type(&[types_instance.get_byte_ptr_type().into(), types_instance.get_size_type().into()], false)
+    }
+
+    fn attrs(&self) -> Vec<(u32, Attribute)> {
+        let attr_factory = LLVMAttributeFactory::get_instance(&self.0);
+        vec![
+            (0, *attr_factory.attr_noalias()),
+            (0, *attr_factory.attr_nounwind()),
+            (1, *attr_factory.attr_nocapture()),
+        ]
+    }
+
+    fn linkage(&self) -> Option<Linkage> {
+        Some(External)
+    }
+}
 
 #[cfg(test)]
 mod tests {
@@ -116,7 +178,7 @@ mod tests {
         let malloc_func_optional = module.get_function("malloc");
         assert!(malloc_func_optional.is_none());
 
-        let malloc_func = decl_manager.get_malloc_decl();
+        let malloc_func = decl_manager.add_decl(MallocDecl::new(&context));
         assert_eq!(malloc_func.count_params(), 1);
         // Free function has one attribute (nounwind)
         assert_eq!(malloc_func.count_attributes(0), 2);
@@ -155,7 +217,7 @@ mod tests {
         let free_func_optional = module.get_function("free");
         assert!(free_func_optional.is_none());
 
-        let free_func = decl_manager.get_free_decl();
+        let free_func = decl_manager.add_decl(FreeDecl::new(&context));
         assert_eq!(*free_func.get_name(), *CString::new("free").unwrap());
         assert_eq!(free_func.count_params(), 1);
 
@@ -195,7 +257,7 @@ mod tests {
         let realloc_func_optional = module.get_function("realloc");
         assert!(realloc_func_optional.is_none());
 
-        let realloc_func = decl_manager.get_realloc_decl();
+        let realloc_func = decl_manager.add_decl(ReallocDecl::new(&context));
         assert_eq!(*realloc_func.get_name(), *CString::new("realloc").unwrap());
         assert_eq!(realloc_func.count_params(), 2);
         assert_eq!(realloc_func.count_attributes(0), 2);

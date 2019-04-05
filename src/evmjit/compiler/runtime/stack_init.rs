@@ -7,7 +7,7 @@ use inkwell::values::PointerValue;
 use evmjit::compiler::evmtypes::EvmTypes;
 use evmjit::compiler::stack::EVM_MAX_STACK_SIZE;
 use singletonum::Singleton;
-use evmjit::compiler::external_declarations::ExternalFunctionManager;
+use evmjit::compiler::external_declarations::{ExternalFunctionManager, MallocDecl};
 
 #[derive(Debug, Copy, Clone)]
 pub struct StackAllocator {
@@ -16,10 +16,14 @@ pub struct StackAllocator {
 }
 
 impl StackAllocator {
-    pub fn new(context: & Context, builder: &Builder, decl_factory: &ExternalFunctionManager) -> StackAllocator {
+    pub fn new(context: &Context, builder: &Builder, decl_factory: &ExternalFunctionManager) -> StackAllocator {
         let types_instance = EvmTypes::get_instance(context);
 
-        let malloc_func = decl_factory.get_malloc_decl();
+        let malloc_func = if let Some(func) = decl_factory.get_decl("malloc") {
+            func
+        } else {
+            decl_factory.add_decl(MallocDecl::new(context))
+        };
         
         let malloc_size = (types_instance.get_word_type().get_bit_width() / 8) * EVM_MAX_STACK_SIZE;
         let malloc_size_ir_value = context.i64_type().const_int (malloc_size as u64, false);

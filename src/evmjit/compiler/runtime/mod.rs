@@ -27,7 +27,7 @@ use evmjit::compiler::evmtypes::EvmTypes;
 use evmjit::compiler::evmconstants::EvmConstants;
 use llvm_sys::LLVMCallConv::*;
 use evmjit::ModuleLookup;
-use evmjit::compiler::external_declarations::ExternalFunctionManager;
+use evmjit::compiler::external_declarations::{ExternalFunctionManager, FreeDecl};
 
 #[derive(PartialEq)]
 pub enum TransactionContextTypeFields {
@@ -134,7 +134,11 @@ impl MainPrologue {
         let types_instance = EvmTypes::get_instance(context);
         let phi = temp_builder.build_phi(types_instance.get_contract_return_type(), "ret");
 
-        let free_func = decl_factory.get_free_decl();
+        let free_func = if let Some(func) = decl_factory.get_decl("free") {
+            func
+        } else {
+            decl_factory.add_decl(FreeDecl::new(context)) 
+        };
 
         temp_builder.build_call(free_func, &[stack_base.into()], "");
         let index = Gas.to_index() as u32;
@@ -179,7 +183,7 @@ impl<'a> RuntimeManager<'a> {
         // Generate IR for runtime type related items
         let rt_type_manager = RuntimeTypeManager::new (&context, &builder, &module);
 
-        let stack_allocator = StackAllocator::new (&context, &builder, &decl_factory);
+        let stack_allocator = StackAllocator::new (&context, &builder, decl_factory);
 
         let gas_ptr_mgr = GasPtrManager::new(context, builder, rt_type_manager.get_gas());
 
