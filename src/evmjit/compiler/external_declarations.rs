@@ -49,11 +49,18 @@ impl<'a> ExternalFunctionManager<'a> {
     pub fn get_decl_by_name<T>(&self, id: T) -> Option<FunctionValue>
         where T: Into<String>
     {
-         if let Some(decl) = self.m_decls.borrow().get(&id.into()) {
-             Some(decl.clone())
-         } else {
-             None
-         }
+        let id_string: String = id.into();
+
+        if let Some(decl) = self.m_decls.borrow().get(&id_string) {
+            return Some(decl.clone());
+        } 
+
+        match id_string.as_str() {
+            "malloc" => Some(self.get_decl(MallocDecl::new(self.m_context))),
+            "free" => Some(self.get_decl(FreeDecl::new(self.m_context))),
+            "realloc" => Some(self.get_decl(ReallocDecl::new(self.m_context))),
+            _ => None,
+        }
     }
 
     /// Gets a declaration given a struct implementing FuncDecl.
@@ -77,7 +84,6 @@ impl<'a> ExternalFunctionManager<'a> {
         map.insert(decl.identifier(), ret);
 
         ret
-        
     }
 }
 
@@ -191,7 +197,7 @@ mod tests {
         let malloc_func_optional = module.get_function("malloc");
         assert!(malloc_func_optional.is_none());
 
-        let malloc_func = decl_manager.get_decl(MallocDecl::new(&context));
+        let malloc_func = decl_manager.get_decl_by_name("malloc").expect("Missing malloc decl");
         assert_eq!(malloc_func.count_params(), 1);
         // Free function has one attribute (nounwind)
         assert_eq!(malloc_func.count_attributes(0), 2);
@@ -230,7 +236,7 @@ mod tests {
         let free_func_optional = module.get_function("free");
         assert!(free_func_optional.is_none());
 
-        let free_func = decl_manager.get_decl(FreeDecl::new(&context));
+        let free_func = decl_manager.get_decl_by_name("free").expect("Missing free decl");
         assert_eq!(*free_func.get_name(), *CString::new("free").unwrap());
         assert_eq!(free_func.count_params(), 1);
 
@@ -270,7 +276,7 @@ mod tests {
         let realloc_func_optional = module.get_function("realloc");
         assert!(realloc_func_optional.is_none());
 
-        let realloc_func = decl_manager.get_decl(ReallocDecl::new(&context));
+        let realloc_func = decl_manager.get_decl_by_name("realloc").expect("Missing realloc decl");
         assert_eq!(*realloc_func.get_name(), *CString::new("realloc").unwrap());
         assert_eq!(realloc_func.count_params(), 2);
         assert_eq!(realloc_func.count_attributes(0), 2);

@@ -27,7 +27,7 @@ use evmjit::compiler::evmtypes::EvmTypes;
 use evmjit::compiler::evmconstants::EvmConstants;
 use llvm_sys::LLVMCallConv::*;
 use evmjit::ModuleLookup;
-use evmjit::compiler::external_declarations::{ExternalFunctionManager, FreeDecl};
+use evmjit::compiler::external_declarations::ExternalFunctionManager;
 
 #[derive(PartialEq)]
 pub enum TransactionContextTypeFields {
@@ -134,7 +134,7 @@ impl MainPrologue {
         let types_instance = EvmTypes::get_instance(context);
         let phi = temp_builder.build_phi(types_instance.get_contract_return_type(), "ret");
 
-        let free_func = decl_factory.get_decl(FreeDecl::new(context));
+        let free_func = decl_factory.get_decl_by_name("free").expect("MainPrologue: Missing free decl");
 
         temp_builder.build_call(free_func, &[stack_base.into()], "");
         let index = Gas.to_index() as u32;
