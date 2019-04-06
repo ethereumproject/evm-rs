@@ -134,11 +134,7 @@ impl MainPrologue {
         let types_instance = EvmTypes::get_instance(context);
         let phi = temp_builder.build_phi(types_instance.get_contract_return_type(), "ret");
 
-        let free_func = if let Some(func) = decl_factory.get_decl("free") {
-            func
-        } else {
-            decl_factory.add_decl(FreeDecl::new(context)) 
-        };
+        let free_func = decl_factory.get_decl(FreeDecl::new(context));
 
         temp_builder.build_call(free_func, &[stack_base.into()], "");
         let index = Gas.to_index() as u32;

@@ -45,7 +45,8 @@ impl<'a> ExternalFunctionManager<'a> {
         ret
     }
 
-    pub fn get_decl<T>(&self, id: T) -> Option<FunctionValue>
+    /// Gets a declaration by its name in the module.
+    pub fn get_decl_by_name<T>(&self, id: T) -> Option<FunctionValue>
         where T: Into<String>
     {
          if let Some(decl) = self.m_decls.borrow().get(&id.into()) {
@@ -55,21 +56,33 @@ impl<'a> ExternalFunctionManager<'a> {
          }
     }
 
-    pub fn add_decl<T>(&self, decl: T) -> FunctionValue 
+    /// Gets a declaration given a struct implementing FuncDecl.
+    pub fn get_decl<T>(&self, decl: T) -> FunctionValue 
         where T: FuncDecl 
     {
+        let mut map = self.m_decls.borrow_mut();
+        
+        // NOTE: this essentially enforces that a function with a given identifier can only be
+        // declared once.
+        if let Some(func) = map.get(&decl.identifier()) {
+            return func.clone();
+        }
+
         let ret = self.m_module.add_function(decl.identifier().as_str(), decl.signature(), decl.linkage());
 
         for (idx, attr) in decl.attrs().iter() {
             ret.add_attribute(*idx, *attr);
         }
 
-        self.m_decls.borrow_mut().insert(decl.identifier(), ret);
+        map.insert(decl.identifier(), ret);
 
         ret
+        
     }
 }
 
+// Perhaps a decl factory would be useful, a struct that simply returns a trait object Box<dyn FuncDecl>
+// when passed a known name string.
 impl<'a> MallocDecl<'a> {
     pub fn new(context: &'a Context) -> Self {
         MallocDecl(context)
@@ -178,7 +191,7 @@ mod tests {
         let malloc_func_optional = module.get_function("malloc");
         assert!(malloc_func_optional.is_none());
 
-        let malloc_func = decl_manager.add_decl(MallocDecl::new(&context));
+        let malloc_func = decl_manager.get_decl(MallocDecl::new(&context));
         assert_eq!(malloc_func.count_params(), 1);
         // Free function has one attribute (nounwind)
         assert_eq!(malloc_func.count_attributes(0), 2);
@@ -217,7 +230,7 @@ mod tests {
         let free_func_optional = module.get_function("free");
         assert!(free_func_optional.is_none());
 
-        let free_func = decl_manager.add_decl(FreeDecl::new(&context));
+        let free_func = decl_manager.get_decl(FreeDecl::new(&context));
         assert_eq!(*free_func.get_name(), *CString::new("free").unwrap());
         assert_eq!(free_func.count_params(), 1);
 
@@ -257,7 +270,7 @@ mod tests {
         let realloc_func_optional = module.get_function("realloc");
         assert!(realloc_func_optional.is_none());
 
-        let realloc_func = decl_manager.add_decl(ReallocDecl::new(&context));
+        let realloc_func = decl_manager.get_decl(ReallocDecl::new(&context));
         assert_eq!(*realloc_func.get_name(), *CString::new("realloc").unwrap());
         assert_eq!(realloc_func.count_params(), 2);
         assert_eq!(realloc_func.count_attributes(0), 2);
