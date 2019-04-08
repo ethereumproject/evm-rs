@@ -267,6 +267,11 @@ impl<'a> RuntimeManager<'a> {
     pub fn reset_return_buf(self) {
         self.m_return_buf_manager.reset_return_buf()
     }
+
+    pub fn get_mem_ptr(&self) -> PointerValue {
+        self.m_rt_type_manager.get_mem_ptr()
+
+    }
 }
 
 #[cfg(test)]
