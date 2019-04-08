@@ -61,11 +61,11 @@ impl GasCheckFunctionCreator {
         let arg3 = types_instance.get_byte_ptr_type();
 
         let gas_func_type = gas_func_ret_type.fn_type(&[arg1.into(), arg2.into(), arg3.into()], false);
-        let gas_func = module.add_function(name, gas_func_type, Some(Internal));
+        let gas_func = module.add_function(name, gas_func_type, Some(Private));
 
         let attr_factory = LLVMAttributeFactory::get_instance(&context);
         gas_func.add_attribute(0, *attr_factory.attr_nounwind());
-        gas_func.add_attribute(0, *attr_factory.attr_nocapture());
+        gas_func.add_attribute(1, *attr_factory.attr_nocapture());
 
         let check_bb = context.append_basic_block(&gas_func, "Check");
         let update_bb = context.append_basic_block(&gas_func, "Update");
@@ -314,14 +314,16 @@ mod tests {
         let gas_check_func = gas_check_fn_optional.unwrap();
         assert_eq!(gas_check_func.count_params(), 3);
         assert_eq!(gas_check_func.count_basic_blocks(), 3);
-        assert_eq!(gas_check_func.get_linkage(), Linkage::Internal);
+        assert_eq!(gas_check_func.get_linkage(), Linkage::Private);
 
-        // Verify gas function has nounwind and nocapture attributes
-        assert_eq!(gas_check_func.count_attributes(0), 2);
+        // Verify gas function has nounwind attribute
+        assert_eq!(gas_check_func.count_attributes(0), 1);
         let nounwind_attr = gas_check_func.get_enum_attribute(0, Attribute::get_named_enum_kind_id("nounwind"));
         assert!(nounwind_attr != None);
 
-        let nocapture_attr = gas_check_func.get_enum_attribute(0, Attribute::get_named_enum_kind_id("nocapture"));
+        assert_eq!(gas_check_func.count_attributes(1), 1);
+        // Verify first operand has nocapture attribute
+        let nocapture_attr = gas_check_func.get_enum_attribute(1, Attribute::get_named_enum_kind_id("nocapture"));
         assert!(nocapture_attr != None);
 
         assert_eq!(nounwind_attr.unwrap(), *attr_factory.attr_nounwind());
