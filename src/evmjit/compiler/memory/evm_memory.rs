@@ -6,6 +6,7 @@ use inkwell::module::Module;
 
 use evmjit::compiler::gas_cost::BasicBlockGasManager;
 use evmjit::compiler::runtime::RuntimeManager;
+use evmjit::compiler::external_declarations::ExternalFunctionManager;
 use patch::Patch;
 use super::mem_representation::MemoryRepresentation;
 
@@ -19,9 +20,11 @@ pub struct EvmMemory<'a, P: Patch + 'a> {
 
 impl<'a, P: Patch> EvmMemory<'a, P> {
     pub fn new(context: &'a Context, builder: &'a Builder, module: &'a Module,
-               gas_manager: &'a BasicBlockGasManager<'a, P>, rt_manager: &RuntimeManager<'a>) -> EvmMemory<'a, P> {
+               gas_manager: &'a BasicBlockGasManager<'a, P>, rt_manager: &RuntimeManager<'a>,
+               external_func_mgr: &'a ExternalFunctionManager) -> EvmMemory<'a, P> {
 
-        let mem = MemoryRepresentation::new(rt_manager.get_mem_ptr(), context, builder, module);
+        let mem = MemoryRepresentation::new(rt_manager.get_mem_ptr(), context,
+                                                                builder, module, external_func_mgr);
 
         EvmMemory {
             m_context: context,
@@ -57,7 +60,7 @@ mod tests {
         let rt_manager = RuntimeManager::new(&context, &builder, &module, &decl_factory);
 
         let gas_manager : BasicBlockGasManager<EmbeddedPatch> = BasicBlockGasManager::new(&context, &builder, &module, &rt_manager);
-        let _memory:EvmMemory<EmbeddedPatch> = EvmMemory::new(&context, &builder, &module, &gas_manager, &rt_manager);
+        let _memory:EvmMemory<EmbeddedPatch> = EvmMemory::new(&context, &builder, &module, &gas_manager, &rt_manager, &decl_factory);
         module.print_to_stderr()
     }
 }
