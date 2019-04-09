@@ -16,12 +16,15 @@ static STACK_SAVE_INTRINSIC_NAME: &str = "llvm.stacksave";
 static BSWAP_I256_IINTRINSIC_NAME: &str = "llvm.bswap.i256";
 static BSWAP_I160_IINTRINSIC_NAME: &str = "llvm.bswap.i160";
 static CTLZ_I256_IINTRINSIC_NAME: &str = "llvm.ctlz.i256";
+static MEMSET_I32_INTRINSIC_NAME: &str = "llvm.memset.p0i8.i32";
+static MEMSET_I64_INTRINSIC_NAME: &str = "llvm.memset.p0i8.i64";
 
 pub enum LLVMIntrinsic {
     Bswap,
     Ctlz,
     FrameAddress,
     LongJmp,
+    MemSet,
     StackSave,
     SetJmp
 }
@@ -56,6 +59,20 @@ impl LLVMIntrinsicManager for LLVMIntrinsic {
                 assert!(int_bit_width == 256);
 
                 CTLZ_I256_IINTRINSIC_NAME
+            },
+
+            LLVMIntrinsic::MemSet => {
+                assert!(arg_type != None);
+                let arg = arg_type.unwrap();
+                assert!(arg.is_int_type());
+                let int_bit_width = arg.into_int_type().get_bit_width();
+                assert!(int_bit_width == 32 || int_bit_width == 64);
+                match int_bit_width {
+                    32 => MEMSET_I32_INTRINSIC_NAME,
+                    64 => MEMSET_I64_INTRINSIC_NAME,
+                    _ => panic!("LLVMIntrinsicManager::to_name: bad integer size for memset"),
+                }
+
             },
 
             // No type
@@ -107,6 +124,34 @@ impl LLVMIntrinsicManager for LLVMIntrinsic {
                 bswap_func.add_attribute(0, *attr_factory.attr_readnone());
                 bswap_func.add_attribute(0, *attr_factory.attr_speculatable());
                 bswap_func
+            },
+
+            LLVMIntrinsic::MemSet => {
+                assert!(arg_type != None);
+                assert!(arg_type.unwrap().is_int_type());
+                let int_bit_width = arg_type.unwrap().into_int_type().get_bit_width();
+
+                let width_t = if int_bit_width == 64 {
+                    IntType::i64_type()
+                } else {
+                    IntType::i32_type()
+                };
+
+                let type_enum = BasicTypeEnum::IntType(width_t);
+                let memset_ret_type = context.void_type();
+                let arg1 = context.i8_type().ptr_type(AddressSpace::Generic);
+                let arg2 = context.i8_type();
+                let arg4 = context.bool_type();
+
+                let memset_func_type = memset_ret_type.fn_type(&[arg1.into(), arg2.into(),
+                                                                            type_enum.into(), arg4.into()], false);
+                let memset_func = module.add_function(self.to_name(arg_type), memset_func_type, Some(External));
+                let attr_factory = LLVMAttributeFactory::get_instance(&context);
+
+                memset_func.add_attribute(0, *attr_factory.attr_nounwind());
+                memset_func.add_attribute(0, *attr_factory.attr_argmemonly());
+                memset_func.add_attribute(1, *attr_factory.attr_nocapture());
+                memset_func
             },
 
             LLVMIntrinsic::Ctlz => {
@@ -194,12 +239,14 @@ mod tests {
 
     #[test]
     fn test_intrinsic_to_name() {
-        //let context = Context::create();
+        let context = Context::create();
 
         let i256_t = IntType::custom_width_int_type(256);
         let i160_t = IntType::custom_width_int_type(160);
         let type_enum_i256_t = BasicTypeEnum::IntType(i256_t);
         let type_enum_i160_t = BasicTypeEnum::IntType(i160_t);
+        let type_enum_i32_t = BasicTypeEnum::IntType(context.i32_type());
+        let type_enum_i64_t = BasicTypeEnum::IntType(context.i64_type());
 
         assert_eq!(LLVMIntrinsic::FrameAddress.to_name(None), "llvm.frameaddress");
         assert_eq!(LLVMIntrinsic::LongJmp.to_name(None), "llvm.eh.sjlj.longjmp");
@@ -208,6 +255,9 @@ mod tests {
         assert_eq!(LLVMIntrinsic::Bswap.to_name(Some(type_enum_i256_t)), "llvm.bswap.i256");
         assert_eq!(LLVMIntrinsic::Bswap.to_name(Some(type_enum_i160_t)), "llvm.bswap.i160");
         assert_eq!(LLVMIntrinsic::Ctlz.to_name(Some(type_enum_i256_t)), "llvm.ctlz.i256");
+
+        assert_eq!(LLVMIntrinsic::MemSet.to_name(Some(type_enum_i32_t)), "llvm.memset.p0i8.i32");
+        assert_eq!(LLVMIntrinsic::MemSet.to_name(Some(type_enum_i64_t)), "llvm.memset.p0i8.i64");
     }
 
     #[test]
