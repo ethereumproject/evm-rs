@@ -109,7 +109,8 @@ mod tests {
     fn test_get_malloc_decl() {
         let context = Context::create();
         let module = context.create_module("my_module");
-
+        
+        let evmtypes = EvmTypes::get_instance(&context);
         let attr_factory = LLVMAttributeFactory::get_instance(&context);
 
         let decl_manager = ExternalFunctionManager::new(&context, &module);
@@ -125,14 +126,14 @@ mod tests {
 
         let size_arg = malloc_func.get_nth_param(0).unwrap();
         assert!(size_arg.is_int_value());
-        assert_eq!(size_arg.into_int_value().get_type(), context.i64_type());
+        assert_eq!(size_arg.into_int_value().get_type(), evmtypes.get_size_type());
 
         let malloc_ret = malloc_func.get_return_type();
         assert!(malloc_ret.is_pointer_type());
 
         let elem_t = malloc_ret.into_pointer_type().get_element_type();
         assert!(elem_t.is_int_type());
-        assert_eq!(elem_t.into_int_type(), context.custom_width_int_type(256));
+        assert_eq!(elem_t.into_int_type(), evmtypes.get_word_type());
 
         let nounwind_attr = malloc_func.get_enum_attribute(0, Attribute::get_named_enum_kind_id("nounwind"));
         assert!(nounwind_attr != None);
@@ -140,15 +141,16 @@ mod tests {
         let noalias_attr = malloc_func.get_enum_attribute(0, Attribute::get_named_enum_kind_id("noalias"));
         assert!(noalias_attr != None);
 
-        assert_eq!(nounwind_attr.unwrap(), *attr_factory.attr_nounwind());
-        assert_eq!(noalias_attr.unwrap(), *attr_factory.attr_noalias());
+        assert_eq!(attr_factory.attr_nounwind().get_enum_kind_id(), nounwind_attr.unwrap().get_enum_kind_id());
+        assert_eq!(attr_factory.attr_noalias().get_enum_kind_id(), noalias_attr.unwrap().get_enum_kind_id());
     }
 
     #[test]
     fn test_get_free_decl() {
         let context = Context::create();
         let module = context.create_module("my_module");
-
+        
+        let evmtypes = EvmTypes::get_instance(&context);
         let attr_factory = LLVMAttributeFactory::get_instance(&context);
 
         let decl_manager = ExternalFunctionManager::new(&context, &module);
@@ -172,16 +174,16 @@ mod tests {
 
         let area_to_be_freed_ptr_elt_t = area_to_be_freed_arg.into_pointer_value().get_type().get_element_type();
         assert!(area_to_be_freed_ptr_elt_t.is_int_type());
-        assert_eq!(area_to_be_freed_ptr_elt_t.into_int_type(), context.custom_width_int_type(256));
+        assert_eq!(area_to_be_freed_ptr_elt_t.into_int_type(), evmtypes.get_word_type());
 
 
         let nounwind_attr = free_func.get_enum_attribute(0, Attribute::get_named_enum_kind_id("nounwind"));
         assert!(nounwind_attr != None);
-        assert_eq!(nounwind_attr.unwrap(), *attr_factory.attr_nounwind());
+        assert_eq!(attr_factory.attr_nounwind().get_enum_kind_id(), nounwind_attr.unwrap().get_enum_kind_id());
 
         let nocapture_attr = free_func.get_enum_attribute(1, Attribute::get_named_enum_kind_id("nocapture"));
         assert!(nocapture_attr != None);
-        assert_eq!(nocapture_attr.unwrap(), *attr_factory.attr_nocapture());
+        assert_eq!(attr_factory.attr_nocapture().get_enum_kind_id(), nocapture_attr.unwrap().get_enum_kind_id());
     }
 
     #[test]
@@ -189,6 +191,7 @@ mod tests {
         let context = Context::create();
         let module = context.create_module("my_module");
 
+        let evmtypes = EvmTypes::get_instance(&context);
         let attr_factory = LLVMAttributeFactory::get_instance(&context);
 
         let decl_manager = ExternalFunctionManager::new(&context, &module);
@@ -207,35 +210,36 @@ mod tests {
         let old_memory_to_realloc_arg = realloc_func.get_nth_param(0).unwrap();
         assert!(old_memory_to_realloc_arg.is_pointer_value());
         let elem_t = old_memory_to_realloc_arg.into_pointer_value().get_type().get_element_type();
-        assert_eq!(elem_t.into_int_type(), context.i8_type());
+        assert_eq!(elem_t.into_int_type(), evmtypes.get_byte_type());
 
         // Validate argument 2 type
 
         let new_memory_size_arg = realloc_func.get_nth_param(1).unwrap();
         assert!(new_memory_size_arg.is_int_value());
-        assert_eq!(new_memory_size_arg.into_int_value().get_type(), context.i64_type());
+        assert_eq!(new_memory_size_arg.into_int_value().get_type(), evmtypes.get_size_type());
 
         // Validate return type
         let realloc_ret = realloc_func.get_return_type();
         assert!(realloc_ret.is_pointer_type());
         let ret_elem_t = realloc_ret.into_pointer_type().get_element_type();
         assert!(ret_elem_t.is_int_type());
-        assert_eq!(ret_elem_t.into_int_type(), context.i8_type());
+        assert_eq!(ret_elem_t.into_int_type(), evmtypes.get_byte_type());
 
         // Validate function attributes
         let nounwind_attr = realloc_func.get_enum_attribute(0, Attribute::get_named_enum_kind_id("nounwind"));
         assert!(nounwind_attr != None);
-        assert_eq!(nounwind_attr.unwrap(), *attr_factory.attr_nounwind());
+
+        assert_eq!(attr_factory.attr_nounwind().get_enum_kind_id(), nounwind_attr.unwrap().get_enum_kind_id());
 
         let noalias_attr = realloc_func.get_enum_attribute(0, Attribute::get_named_enum_kind_id("noalias"));
         assert!(noalias_attr != None);
-        assert_eq!(noalias_attr.unwrap(), *attr_factory.attr_noalias());
+
+        assert_eq!(attr_factory.attr_noalias().get_enum_kind_id(), noalias_attr.unwrap().get_enum_kind_id());
 
         // Validate parameter attribute
-
         let nocapture_attr = realloc_func.get_enum_attribute(1, Attribute::get_named_enum_kind_id("nocapture"));
         assert!(nocapture_attr != None);
-        assert_eq!(nocapture_attr.unwrap(), *attr_factory.attr_nocapture());
 
+        assert_eq!(attr_factory.attr_nocapture().get_enum_kind_id(), nocapture_attr.unwrap().get_enum_kind_id());
     }
 }
