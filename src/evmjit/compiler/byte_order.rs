@@ -6,8 +6,9 @@ use inkwell::context::Context;
 use inkwell::builder::Builder;
 use inkwell::types::BasicTypeEnum;
 use super::intrinsics::{LLVMIntrinsic, LLVMIntrinsicManager};
+use super::JITContext;
 
-pub fn byte_order_swap(context: &Context, module: &Module, builder: &Builder, value: IntValue) -> IntValue {
+pub fn byte_order_swap(context: &JITContext, builder: &Builder, value: IntValue) -> IntValue {
     // Swap byte order if the host system is little endian
 
     if cfg!(target_endian = "little") {
@@ -18,7 +19,7 @@ pub fn byte_order_swap(context: &Context, module: &Module, builder: &Builder, va
 
         let enum_addr_type = BasicTypeEnum::IntType(value.get_type());
         let bswap_arg = Some(enum_addr_type);
-        let bswap_func = LLVMIntrinsic::Bswap.get_intrinsic_declaration(context, module, bswap_arg);
+        let bswap_func = LLVMIntrinsic::Bswap.get_intrinsic_declaration(context, bswap_arg);
         let callsite_val = builder.build_call (bswap_func, &[value.into()], "");
 
         // build_call returns a Either<BasicValueEnum, InstructionValue>

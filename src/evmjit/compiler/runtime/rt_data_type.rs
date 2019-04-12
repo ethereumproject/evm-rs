@@ -1,7 +1,5 @@
 #![allow(dead_code)]
-
 use std::ffi::CString;
-use singletonum::{Singleton, SingletonInit};
 use inkwell::context::Context;
 use inkwell::types::StructType;
 use inkwell::types::PointerType;
@@ -73,7 +71,7 @@ impl RuntimeDataFieldToName for RuntimeDataTypeFields {
 
 }
 
-#[derive(Debug, Singleton)]
+#[derive(Debug)]
 
 // RuntimeDataType is the struct that the JIT will build to pass
 // arguments from the VM to the contract at runtime
@@ -84,12 +82,8 @@ pub struct RuntimeDataType
     rt_ptr_type: PointerType,
 }
 
-unsafe impl Sync for RuntimeDataType {}
-unsafe impl Send for RuntimeDataType {}
-
-impl SingletonInit for RuntimeDataType {
-    type Init = Context;
-    fn init(context: &Context) -> Self {
+impl RuntimeDataType {
+    pub fn new(context: &Context) -> Self {
         let size_t = context.i64_type();
         let byte_ptr_t = context.i8_type().ptr_type(AddressSpace::Generic);
         let evm_word_t = context.custom_width_int_type(256);
@@ -112,9 +106,7 @@ impl SingletonInit for RuntimeDataType {
             rt_ptr_type: rt_struct.ptr_type(AddressSpace::Generic)
         }
     }
-}
 
-impl RuntimeDataType {    
     pub fn get_type(&self) -> StructType {
         self.rt_type
     }
@@ -237,7 +229,7 @@ fn test_data_field_to_name() {
 
 fn test_runtime_data_type() {
     let context = Context::create();
-    let rt_data_type_singleton = RuntimeDataType::get_instance(&context);
+    let rt_data_type_singleton = RuntimeDataType::new(&context);
     let rt_struct = rt_data_type_singleton.get_type();
 
     assert!(RuntimeDataType::is_rt_data_type (&rt_struct));

@@ -1,14 +1,11 @@
 #![allow(dead_code)]
 
-use inkwell::context::Context;
-use inkwell::builder::Builder;
-use inkwell::module::Module;
 use inkwell::basic_block::BasicBlock;
 use inkwell::module::Linkage::*;
 use evmjit::compiler::runtime::rt_type::RuntimeType;
 use singletonum::Singleton;
-use evmjit::compiler::evmtypes::EvmTypes;
 use inkwell::values::FunctionValue;
+use super::JITContext;
 
 pub struct MainFuncCreator {
     m_main_func: FunctionValue,
@@ -19,21 +16,23 @@ pub struct MainFuncCreator {
 }
 
 impl MainFuncCreator {
-    pub fn new(name : &str, context: &Context, builder: &Builder, module: &Module) -> MainFuncCreator {
-
-        let types_instance = EvmTypes::get_instance(context);
+    pub fn new(name: &str, context: &JITContext) -> MainFuncCreator {
+        let llvm_ctx = context.llvm_context();
+        let builder = context.builder();
+        let module = context.module();
+        let types_instance = context.evm_types();
         let main_ret_type = types_instance.get_contract_return_type();
 
-        let arg1 = RuntimeType::get_instance(context).get_ptr_type();
+        let arg1 = context.rt().get_ptr_type();
         
         let main_func_type = main_ret_type.fn_type(&[arg1.into()], false);
         let main_func = module.add_function (name, main_func_type, Some(External));
         main_func.get_first_param().unwrap().into_pointer_value().set_name("rt");
 
-        let entry_bb = context.append_basic_block(&main_func, "Entry");
-        let stop_bb = context.append_basic_block(&main_func, "Stop");
-        let jumptable_bb = context.append_basic_block(&main_func, "JumpTable");
-        let abort_bb = context.append_basic_block(&main_func, "Abort");
+        let entry_bb = llvm_ctx.append_basic_block(&main_func, "Entry");
+        let stop_bb = llvm_ctx.append_basic_block(&main_func, "Stop");
+        let jumptable_bb = llvm_ctx.append_basic_block(&main_func, "JumpTable");
+        let abort_bb = llvm_ctx.append_basic_block(&main_func, "Abort");
 
         builder.position_at_end(&jumptable_bb);
         let target = builder.build_phi(types_instance.get_word_type(), "target");

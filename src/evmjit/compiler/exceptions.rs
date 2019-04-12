@@ -10,33 +10,34 @@ use evmjit::compiler::evmtypes::EvmTypes;
 use evmjit::compiler::intrinsics::LLVMIntrinsic;
 use evmjit::compiler::intrinsics::LLVMIntrinsicManager;
 use singletonum::Singleton;
+use super::JITContext;
 
 pub struct ExceptionManager {
     exception_dest: PointerValue,
 }
 
 impl ExceptionManager {
-    pub fn new(context: &Context, builder: &Builder, module: &Module,
+    pub fn new(context: &JITContext,
                normal_path_bb: &BasicBlock, exception_bb: &BasicBlock) -> ExceptionManager {
 
-        let types_instance = EvmTypes::get_instance(context);
-        let buf_size = context.i64_type().const_int(3, false);
+        let builder = context.builder();
+        let llvm_ctx = context.llvm_context();
+        let types_instance = context.evm_types();
+        let buf_size = llvm_ctx.i64_type().const_int(3, false);
         let byte_ptr_t = types_instance.get_byte_ptr_type();
         let setjmp_words = builder.build_array_alloca(byte_ptr_t, buf_size, "jmpbuf.words");
 
-        let frame_addr_decl = LLVMIntrinsic::FrameAddress.get_intrinsic_declaration(&context,
-                                                                                    &module,
+        let frame_addr_decl = LLVMIntrinsic::FrameAddress.get_intrinsic_declaration(context,
                                                                                     None);
 
-        let i32_zero = context.i32_type().const_int(0, false);
+        let i32_zero = llvm_ctx.i32_type().const_int(0, false);
 
         // Save frame pointer
         let fp = builder.build_call (frame_addr_decl, &[i32_zero.into()], "fp");
         let fp_result_as_basic_val = fp.try_as_basic_value().left().unwrap();
         builder.build_store(setjmp_words, fp_result_as_basic_val);
 
-        let stack_save_decl = LLVMIntrinsic::StackSave.get_intrinsic_declaration(&context,
-                                                                                 &module,
+        let stack_save_decl = LLVMIntrinsic::StackSave.get_intrinsic_declaration(context,
                                                                                  None);
 
         // Save stack pointer
@@ -45,12 +46,11 @@ impl ExceptionManager {
 
 
         unsafe {
-            let i64_two = context.i64_type().const_int(2, false);
+            let i64_two = llvm_ctx.i64_type().const_int(2, false);
             let jmp_buf_sp = builder.build_in_bounds_gep(setjmp_words, &[i64_two.into()], "jmpBuf.sp");
             builder.build_store(jmp_buf_sp, sp_result_as_basic_val);
 
-            let setjmp_decl = LLVMIntrinsic::SetJmp.get_intrinsic_declaration(&context,
-                                                                              &module,
+            let setjmp_decl = LLVMIntrinsic::SetJmp.get_intrinsic_declaration(context,
                                                                               None);
         
             let jmp_buf = builder.build_pointer_cast(setjmp_words, byte_ptr_t, "jmpBuf");
@@ -86,14 +86,16 @@ mod tests {
 
     #[test]
     fn test_exception_manager() {
-        let context = Context::create();
-        let module = context.create_module("my_module");
-        let builder = context.create_builder();
-        let decl_factory = ExternalFunctionManager::new(&context, &module);
+        let jitctx = JITContext::new();
+        let decl_factory = ExternalFunctionManager::new(&jitctx);
+
+        let context = jitctx.llvm_context();
+        let module = jitctx.module();
+        let builder = jitctx.builder();
 
         // Generate outline of main function needed by 'RuntimeTypeManager
-        let main_func = MainFuncCreator::new ("main", &context, &builder, &module);
-        let _runtime = RuntimeManager::new(&context, &builder, &module, &decl_factory);
+        let main_func = MainFuncCreator::new ("main", &jitctx);
+        let _runtime = RuntimeManager::new(&jitctx, &decl_factory);
 
         let normal_path_block = main_func.get_entry_bb().get_next_basic_block();
         assert!(normal_path_block != None);
@@ -108,7 +110,7 @@ mod tests {
 
         builder.position_at_end(&exception_handler_bb);
 
-        let _exception_mgr = ExceptionManager::new(&context, &builder, &module, &normal_block, exception_block);
+        let _exception_mgr = ExceptionManager::new(&jitctx, &normal_block, exception_block);
 
         //module.print_to_stderr();
 

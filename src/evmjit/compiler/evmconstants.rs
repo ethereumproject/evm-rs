@@ -1,31 +1,21 @@
 #![allow(dead_code)]
-
-use singletonum::{Singleton, SingletonInit};
 use inkwell::context::Context;
 use inkwell::values::IntValue;
 
-#[derive(Debug, Singleton)]
-
+#[derive(Debug)]
 pub struct EvmConstants {
     gas_max: IntValue,
     i64_zero : IntValue,
 }
 
-unsafe impl Sync for EvmConstants {}
-unsafe impl Send for EvmConstants {}
-
-impl SingletonInit for EvmConstants {
-    type Init = Context;
-    
-    fn init(context: &Context) -> Self {
+impl EvmConstants {
+    pub fn new(context: &Context) -> Self {
         EvmConstants {
             gas_max: context.i64_type().const_int(std::i64::MAX as u64, false),
-            i64_zero: context.i64_type().const_int(0, false),
+            i64_zero: context.i64_type().const_int(0u64, false),
         }
     }
-}
 
-impl EvmConstants {
     pub fn get_gas_max(&self) -> IntValue {
         self.gas_max
     }
@@ -38,7 +28,7 @@ impl EvmConstants {
 #[test]
 fn test_evmconstants() {
     let context = Context::create();
-    let evm_constants_singleton = EvmConstants::get_instance(&context);
+    let evm_constants_singleton = EvmConstants::new(&context);
 
     let max_g = evm_constants_singleton.get_gas_max();
     assert!(max_g.is_const());
@@ -49,5 +39,3 @@ fn test_evmconstants() {
     assert_eq!(i64_zero.get_zero_extended_constant(), Some(0));
 
 }
-
-

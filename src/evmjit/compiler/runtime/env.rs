@@ -1,13 +1,11 @@
 #![allow(dead_code)]
-
-use singletonum::{Singleton, SingletonInit};
 use inkwell::context::Context;
 use inkwell::types::StructType;
 use inkwell::types::PointerType;
 use inkwell::AddressSpace;
 use std::ffi::CString;
 
-#[derive(Debug, Singleton)]
+#[derive(Debug)]
 
 pub struct EnvDataType
 {
@@ -15,12 +13,8 @@ pub struct EnvDataType
     env_ptr_type: PointerType,
 }
 
-unsafe impl Sync for EnvDataType {}
-unsafe impl Send for EnvDataType {}
-
-impl SingletonInit for EnvDataType {
-    type Init = Context;
-    fn init(context: &Context) -> Self {
+impl EnvDataType {
+    pub fn new(context: &Context) -> Self {
         let env_t = context.opaque_struct_type("Env");
         
         EnvDataType {
@@ -28,9 +22,7 @@ impl SingletonInit for EnvDataType {
             env_ptr_type : env_t.ptr_type(AddressSpace::Generic)
         }
     }
-}
 
-impl EnvDataType {
     pub fn get_type(&self) -> StructType {
         self.env_type
     }
@@ -67,7 +59,7 @@ impl EnvDataType {
 #[test]
 fn test_env_data_type() {
     let context = Context::create();
-    let env_data_type_singleton = EnvDataType::get_instance(&context);
+    let env_data_type_singleton = EnvDataType::new(&context);
     let env_data_t = env_data_type_singleton.get_type();
 
     assert!(EnvDataType::is_env_data_type(&env_data_t));

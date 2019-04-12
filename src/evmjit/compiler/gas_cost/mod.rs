@@ -17,7 +17,7 @@ use inkwell::values::IntValue;
 use inkwell::module::Linkage::*;
 use inkwell::IntPredicate;
 use inkwell::values::FunctionValue;
-use evmjit::LLVMAttributeFactory;
+use evmjit::compiler::attributes::LLVMAttributeFactory;
 use evmjit::compiler::runtime::RuntimeManager;
 use singletonum::Singleton;
 use evmjit::compiler::evmtypes::EvmTypes;
@@ -27,6 +27,8 @@ use self::fixed_gas_cost::FixedGasCostCalculator;
 use self::variable_gas_cost::VariableGasCostCalculator;
 use evmjit::compiler::intrinsics::LLVMIntrinsic;
 use evmjit::compiler::intrinsics::LLVMIntrinsicManager;
+
+use super::JITContext;
 
 pub trait InstructionGasCost {
     fn count_fixed_instruction_cost(&mut self, inst_opcode: Opcode, exc_mgr: &ExceptionManager) ;
@@ -46,8 +48,11 @@ pub struct GasCheckFunctionCreator {
 }
 
 impl GasCheckFunctionCreator {
-    pub fn new(name : &str, context: &Context, _builder: &Builder, module: &Module) -> GasCheckFunctionCreator {
-        let types_instance = EvmTypes::get_instance(context);
+    pub fn new(name : &str, jitctx: &JITContext) -> GasCheckFunctionCreator {
+        let context = jitctx.llvm_context();
+        let module = jitctx.module();
+
+        let types_instance = jitctx.evm_types();
 
         let gas_func_ret_type = context.void_type();
 
@@ -63,7 +68,7 @@ impl GasCheckFunctionCreator {
         let gas_func_type = gas_func_ret_type.fn_type(&[arg1.into(), arg2.into(), arg3.into()], false);
         let gas_func = module.add_function(name, gas_func_type, Some(Private));
 
-        let attr_factory = LLVMAttributeFactory::get_instance(&context);
+        let attr_factory = jitctx.attributes();
         gas_func.add_attribute(0, *attr_factory.attr_nounwind());
         gas_func.add_attribute(1, *attr_factory.attr_nocapture());
 
@@ -107,8 +112,7 @@ impl GasCheckFunctionCreator {
         // If we enter this basic block, we ran out ouf gas.
         // Use longjmp to trigger an exception
 
-        let func_decl = LLVMIntrinsic::LongJmp.get_intrinsic_declaration(&context,
-                                                                         &module,
+        let func_decl = LLVMIntrinsic::LongJmp.get_intrinsic_declaration(jitctx,
                                                                          None);
 
         gas_func_builder.build_call (func_decl, &[jmp_buf.into_pointer_value().into()], "longJmp");
@@ -126,8 +130,7 @@ impl GasCheckFunctionCreator {
 }
 
 pub struct BasicBlockGasManager<'a, P: Patch> {
-    m_context: &'a Context,
-    m_builder: &'a Builder,
+    m_context: &'a JITContext,
     m_runtime: &'a RuntimeManager<'a>,
     m_variable_cost: VariableGasCostCalculator<'a, P>,
     m_block_gas_cost: Cell<i64>,
@@ -137,15 +140,14 @@ pub struct BasicBlockGasManager<'a, P: Patch> {
 
 
 impl<'a, P: Patch> BasicBlockGasManager<'a, P> {
-    pub fn new(context: &'a Context, builder: &'a Builder, module: &'a Module,
+    pub fn new(jitctx: &'a JITContext,
                runtime: &'a RuntimeManager<'a>) -> BasicBlockGasManager<'a, P> {
 
-        let variable_cost_calculator: VariableGasCostCalculator<P> = VariableGasCostCalculator::new(&context, &builder, &module);
-        let func_creator = GasCheckFunctionCreator::new("gas.check", &context, &builder, &module);
+        let variable_cost_calculator: VariableGasCostCalculator<P> = VariableGasCostCalculator::new(&jitctx);
+        let func_creator = GasCheckFunctionCreator::new("gas.check", &jitctx);
 
         BasicBlockGasManager {
-            m_context: context,
-            m_builder: builder,
+            m_context: jitctx,
             m_runtime: runtime,
             m_variable_cost: variable_cost_calculator,
             m_block_gas_cost: Cell::new(0),
@@ -155,27 +157,28 @@ impl<'a, P: Patch> BasicBlockGasManager<'a, P> {
     }
 
     fn count_variable_cost(&self, cost: IntValue, exc_mgr: &ExceptionManager) {
-        let types_instance = EvmTypes::get_instance(self.m_context);
+        let types_instance = self.m_context.evm_types();
         let word_type = types_instance.get_word_type();
 
         let arg1 = *self.m_runtime.get_gas_ptr();
         let arg3 = exc_mgr.get_exception_dest();
 
         if cost.get_type() == word_type {
-            let const_factory = EvmConstants::get_instance(self.m_context);
+            let builder = self.m_context.builder();
+            let const_factory = self.m_context.evm_constants();
             let gas_max = const_factory.get_gas_max();
-            let gas_max_256 = self.m_builder.build_int_z_extend(gas_max, word_type, "");
-            let too_high = self.m_builder.build_int_compare(IntPredicate::UGT, cost, gas_max_256, "");
-            let cost64 = self.m_builder.build_int_truncate(cost, types_instance.get_gas_type(), "");
-            let cost_to_use = self.m_builder.build_select(too_high, gas_max, cost64, "cost");
+            let gas_max_256 = builder.build_int_z_extend(gas_max, word_type, "");
+            let too_high = builder.build_int_compare(IntPredicate::UGT, cost, gas_max_256, "");
+            let cost64 = builder.build_int_truncate(cost, types_instance.get_gas_type(), "");
+            let cost_to_use = builder.build_select(too_high, gas_max, cost64, "cost");
 
 
             let arg2 = cost_to_use;
-            self.m_builder.build_call(self.m_gas_check_creator.get_gas_check_func_decl(), &[arg1.into(), arg2.into(), arg3.into()], "");
+            builder.build_call(self.m_gas_check_creator.get_gas_check_func_decl(), &[arg1.into(), arg2.into(), arg3.into()], "");
         }
         else {
             assert!(cost.get_type() == types_instance.get_gas_type());
-            self.m_builder.build_call(self.m_gas_check_creator.get_gas_check_func_decl(), &[arg1.into(), cost.into(), arg3.into()], "");
+            self.m_context.builder().build_call(self.m_gas_check_creator.get_gas_check_func_decl(), &[arg1.into(), cost.into(), arg3.into()], "");
         }
     }
 
@@ -216,7 +219,7 @@ impl<'a, P: Patch> BasicBlockGasManager<'a, P> {
                 self.reset_gas_check_call();
             }
             else {
-                let types_instance = EvmTypes::get_instance(self.m_context);
+                let types_instance = self.m_context.evm_types();
                 let val = types_instance.get_gas_type().const_int(self.get_block_gas_cost() as u64, false);
 
                 // Update mocked gas check call with calculated gas of basic block
@@ -236,13 +239,14 @@ impl<'a, P: Patch> InstructionGasCost for BasicBlockGasManager<'a, P> {
     fn count_fixed_instruction_cost(&mut self, inst_opcode: Opcode, exc_mgr: &ExceptionManager) {
         // If we have not generated a call to the gas check function for this block do it now
         if self.has_gas_check_call() == false {
-            let types_instance = EvmTypes::get_instance(self.m_context);
+            let types_instance = self.m_context.evm_types();
+            let builder = self.m_context.builder();
 
             let arg1 = *self.m_runtime.get_gas_ptr();
             let arg2 = types_instance.get_gas_type().get_undef();
             let arg3 = exc_mgr.get_exception_dest();
 
-            let gas_call = self.m_builder.build_call(self.m_gas_check_creator.get_gas_check_func_decl(),
+            let gas_call = builder.build_call(self.m_gas_check_creator.get_gas_check_func_decl(),
                                                             &[arg1.into(), arg2.into(), arg3.into()], "");
             self.update_gas_check_call(gas_call);
             assert!(self.has_gas_check_call());
@@ -270,8 +274,9 @@ impl<'a, P: Patch> InstructionGasCost for BasicBlockGasManager<'a, P> {
     }
 
     fn count_exp_cost(&self, exponent: IntValue, exc_mgr: &ExceptionManager) {
-        assert!(self.m_builder.get_insert_block() != None);
-        let current_block = self.m_builder.get_insert_block().unwrap();
+        let builder = self.m_context.builder();
+        assert!(builder.get_insert_block() != None);
+        let current_block = builder.get_insert_block().unwrap();
         let cost = self.m_variable_cost.exp_cost(&current_block, exponent);
         self.count_variable_cost(cost, exc_mgr);
     }
@@ -292,20 +297,20 @@ mod tests {
 
     #[test]
     fn test_gas_check_func_creator() {
-        let context = Context::create();
-        let module = context.create_module("my_module");
-        let builder = context.create_builder();
-        let decl_factory = ExternalFunctionManager::new(&context, &module);
+        let jitctx = JITContext::new();
+        let context = jitctx.llvm_context();
+        let module = jitctx.module();
+        let decl_factory = ExternalFunctionManager::new(&jitctx);
 
-        let attr_factory = LLVMAttributeFactory::get_instance(&context);
+        let attr_factory = jitctx.attributes();
 
         // Generate outline of main function needed by 'RuntimeTypeManager
-        MainFuncCreator::new("main", &context, &builder, &module);
+        MainFuncCreator::new("main", &jitctx);
 
         //let manager = RuntimeManager::new("main", &context, &builder, &module);
-        let _manager = RuntimeManager::new(&context, &builder, &module, &decl_factory);
+        let _manager = RuntimeManager::new(&jitctx, &decl_factory);
 
-        GasCheckFunctionCreator::new("gas.check", &context, &builder, &module);
+        GasCheckFunctionCreator::new("gas.check", &jitctx);
 
         //module.print_to_stderr();
 
