@@ -1,13 +1,9 @@
-use inkwell::context::Context;
-use inkwell::module::Module;
+use inkwell::AddressSpace;
 use inkwell::types::BasicTypeEnum;
 use inkwell::values::FunctionValue;
-use evmjit::compiler::attributes::LLVMAttributeFactory;
-use singletonum::Singleton;
-use evmjit::compiler::evmtypes::EvmTypes;
-use inkwell::module::Linkage::*;
-use inkwell::AddressSpace;
 use inkwell::types::IntType;
+use inkwell::module::Linkage::*;
+
 use super::JITContext;
 
 static FRAME_ADDRESS_INTRINSIC_NAME: &str = "llvm.frameaddress";
@@ -249,9 +245,12 @@ impl LLVMIntrinsicManager for LLVMIntrinsic {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use inkwell::context::Context;
     use inkwell::types::IntType;
     use inkwell::attributes::Attribute;
+    use inkwell::module::Linkage::*;
+
+    use super::*;
 
     #[test]
     fn test_intrinsic_to_name() {

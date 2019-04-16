@@ -44,7 +44,7 @@ impl JITContext {
     pub fn new() -> Self {
         let ctx = Context::create();
         let builder = ctx.create_builder();
-        let module = ctx.create_module("placeholder"); // TODO: fix the name.
+        let module = ctx.create_module("evm");
         let types = EvmTypes::new(&ctx);
         let constants = EvmConstants::new(&ctx);
         let attr_factory = LLVMAttributeFactory::new(&ctx);

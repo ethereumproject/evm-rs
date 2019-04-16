@@ -1,20 +1,14 @@
 #![allow(dead_code)]
 
-use singletonum::Singleton;
-use inkwell::context::Context;
-use inkwell::builder::Builder;
-use inkwell::module::Module;
 use inkwell::values::FunctionValue;
 use inkwell::module::Linkage::*;
 use std::cell::RefCell;
 use evmjit::compiler::gas_cost::BasicBlockGasManager;
 use evmjit::compiler::runtime::RuntimeManager;
 use evmjit::compiler::external_declarations::ExternalFunctionManager;
-use evmjit::compiler::evmtypes::EvmTypes;
 use patch::Patch;
 use super::super::JITContext;
 use super::mem_representation::MemoryRepresentation;
-use super::mem_representation::MemoryRepresentationType;
 use evmjit::compiler::byte_order::byte_order_swap;
 
 struct MemoryFuncDeclarationManager<'a> {

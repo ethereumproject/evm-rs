@@ -3,14 +3,9 @@ use std::marker::PhantomData;
 use patch::Patch;
 use inkwell::values::IntValue;
 use inkwell::types::BasicTypeEnum;
-use inkwell::builder::Builder;
-use evmjit::compiler::evmtypes::EvmTypes;
 use evmjit::compiler::intrinsics::LLVMIntrinsic;
 use evmjit::compiler::intrinsics::LLVMIntrinsicManager;
-use singletonum::Singleton;
 use inkwell::IntPredicate;
-use inkwell::context::Context;
-use inkwell::module::Module;
 use evmjit::ModuleLookup;
 use inkwell::basic_block::BasicBlock;
 use eval::cost::G_LOGDATA;
@@ -208,13 +203,8 @@ fn native_log_base2(gas_val: Gas) -> usize {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use evmjit::compiler::evmtypes::EvmTypes;
     use evmjit::compiler::intrinsics::LLVMIntrinsic;
     use evmjit::compiler::intrinsics::LLVMIntrinsicManager;
-    use singletonum::Singleton;
-    use inkwell::context::Context;
-    use inkwell::module::Module;
-    use inkwell::builder::Builder;
     use inkwell::types::BasicTypeEnum;
     use inkwell::execution_engine::{ExecutionEngine, JitFunction, FunctionLookupError};
     use inkwell::OptimizationLevel;

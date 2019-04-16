@@ -1,8 +1,10 @@
 #![allow(dead_code)]
 
-use inkwell::values::FunctionValue;
 use std::cell::RefCell;
+
+use inkwell::values::FunctionValue;
 use inkwell::module::Linkage::*;
+
 use super::JITContext;
 
 pub struct ExternalFunctionManager<'a> {
@@ -93,9 +95,11 @@ impl<'a> ExternalFunctionManager<'a> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use inkwell::attributes::Attribute;
     use std::ffi::CString;
+
+    use inkwell::attributes::Attribute;
+
+    use super::*;
 
     #[test]
     fn test_get_malloc_decl() {

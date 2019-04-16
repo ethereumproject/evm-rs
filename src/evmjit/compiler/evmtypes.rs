@@ -1,4 +1,5 @@
 #![allow(dead_code)]
+
 use inkwell::context::Context;
 use inkwell::types::IntType;
 use inkwell::types::PointerType;
@@ -6,7 +7,6 @@ use inkwell::types::VoidType;
 use inkwell::AddressSpace;
 
 #[derive(Debug)]
-
 pub struct EvmTypes {
     word_type: IntType,
     word_ptr_type: PointerType,

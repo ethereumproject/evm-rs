@@ -1,15 +1,11 @@
 #![allow(dead_code)]
 use std::ffi::CString;
 use inkwell::context::Context;
-use inkwell::builder::Builder;
-use inkwell::module::Module;
 use inkwell::types::StructType;
 use inkwell::types::PointerType;
 use inkwell::values::PointerValue;
 use inkwell::AddressSpace;
 use evmjit::BasicTypeEnumCompare;
-use evmjit::compiler::attributes::LLVMAttributeFactory;
-use evmjit::compiler::evmtypes::EvmTypes;
 use std::cell::RefCell;
 use inkwell::module::Linkage::*;
 use inkwell::values::FunctionValue;

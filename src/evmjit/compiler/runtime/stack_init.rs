@@ -1,12 +1,8 @@
 #![allow(dead_code)]
 
-use inkwell::context::Context;
-use inkwell::builder::Builder;
 use inkwell::values::BasicValueEnum;
 use inkwell::values::PointerValue;
-use evmjit::compiler::evmtypes::EvmTypes;
 use evmjit::compiler::stack::EVM_MAX_STACK_SIZE;
-use singletonum::Singleton;
 use evmjit::compiler::external_declarations::ExternalFunctionManager;
 
 use super::super::JITContext;

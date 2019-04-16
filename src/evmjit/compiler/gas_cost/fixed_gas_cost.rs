@@ -1,6 +1,6 @@
-use util::opcode::Opcode;
-
 use std::marker::PhantomData;
+
+use util::opcode::Opcode;
 use eval::cost::G_ZERO;
 use eval::cost::G_BASE;
 use eval::cost::G_VERYLOW;
@@ -20,7 +20,6 @@ use bigint::Gas;
 
 const NO_FIXED_GAS_COST: u64 = 0;
 
-
 fn u64_from_gas(gas: Gas) -> u64 {
     gas.as_u64() as u64
 }
@@ -34,7 +33,6 @@ pub struct FixedGasCostCalculator<P: Patch> {
 }
 
 impl<P: Patch> FixedGasCostCalculator<P>  {
-
     pub fn new() -> FixedGasCostCalculator<P> {
         FixedGasCostCalculator {
             _marker: PhantomData

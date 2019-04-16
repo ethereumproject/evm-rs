@@ -1,10 +1,9 @@
 #![allow(dead_code)]
 
-use inkwell::basic_block::BasicBlock;
 use inkwell::module::Linkage::*;
-use evmjit::compiler::runtime::rt_type::RuntimeType;
-use singletonum::Singleton;
+use inkwell::basic_block::BasicBlock;
 use inkwell::values::FunctionValue;
+
 use super::JITContext;
 
 pub struct MainFuncCreator {
@@ -21,8 +20,8 @@ impl MainFuncCreator {
         let builder = context.builder();
         let module = context.module();
         let types_instance = context.evm_types();
-        let main_ret_type = types_instance.get_contract_return_type();
 
+        let main_ret_type = types_instance.get_contract_return_type();
         let arg1 = context.rt().get_ptr_type();
         
         let main_func_type = main_ret_type.fn_type(&[arg1.into()], false);

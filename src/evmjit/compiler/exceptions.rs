@@ -1,15 +1,11 @@
 #![allow(dead_code)]
 
-use inkwell::context::Context;
-use inkwell::module::Module;
-use inkwell::builder::Builder;
 use inkwell::values::PointerValue;
 use inkwell::basic_block::BasicBlock;
 use inkwell::IntPredicate;
-use evmjit::compiler::evmtypes::EvmTypes;
-use evmjit::compiler::intrinsics::LLVMIntrinsic;
-use evmjit::compiler::intrinsics::LLVMIntrinsicManager;
-use singletonum::Singleton;
+
+use super::intrinsics::LLVMIntrinsic;
+use super::intrinsics::LLVMIntrinsicManager;
 use super::JITContext;
 
 pub struct ExceptionManager {
@@ -19,7 +15,6 @@ pub struct ExceptionManager {
 impl ExceptionManager {
     pub fn new(context: &JITContext,
                normal_path_bb: &BasicBlock, exception_bb: &BasicBlock) -> ExceptionManager {
-
         let builder = context.builder();
         let llvm_ctx = context.llvm_context();
         let types_instance = context.evm_types();
@@ -75,11 +70,12 @@ impl ExceptionManager {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use inkwell::values::BasicValue;
     use inkwell::values::InstructionOpcode;
+
+    use super::*;
     use evmjit::compiler::evm_compiler::MainFuncCreator;
     use evmjit::compiler::runtime::RuntimeManager;
-    use inkwell::values::BasicValue;
     use evmjit::GetOperandValue;
     use evmjit::GetOperandBasicBlock;
     use evmjit::compiler::external_declarations::ExternalFunctionManager;

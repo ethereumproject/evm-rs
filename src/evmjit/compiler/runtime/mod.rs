@@ -6,25 +6,17 @@ pub mod stack_init;
 pub mod rt_data_type;
 pub mod rt_type;
 
-use inkwell::context::Context;
-use inkwell::builder::Builder;
-use inkwell::module::Module;
 use inkwell::types::StructType;
 use inkwell::types::PointerType;
 use inkwell::values::BasicValueEnum;
 use inkwell::values::PointerValue;
 use inkwell::values::FunctionValue;
 use inkwell::basic_block::BasicBlock;
-use singletonum::Singleton;
-use self::rt_data_type::RuntimeDataType;
-use self::rt_type::RuntimeType;
 use self::rt_type::RuntimeTypeManager;
 use self::rt_data_type::RuntimeDataTypeFields::Gas;
 use self::rt_data_type::RuntimeDataFieldToIndex;
 use self::txctx::TransactionContextManager;
 use self::stack_init::StackAllocator;
-use evmjit::compiler::evmtypes::EvmTypes;
-use evmjit::compiler::evmconstants::EvmConstants;
 use llvm_sys::LLVMCallConv::*;
 use evmjit::ModuleLookup;
 use evmjit::compiler::external_declarations::ExternalFunctionManager;
@@ -278,13 +270,17 @@ impl<'a> RuntimeManager<'a> {
 #[cfg(test)]
 mod runtime_tests {
     use std::ffi::CString;
-    use super::*;
+
     use inkwell::values::InstructionOpcode;
-    use self::txctx::TransactionContextType;
-    use self::env::EnvDataType;
-    use evmjit::compiler::evm_compiler::MainFuncCreator;
-    use evmjit::GetOperandValue;
     use inkwell::module::Linkage::External;
+
+    use evmjit::GetOperandValue;
+    use evmjit::compiler::evm_compiler::MainFuncCreator;
+    use super::*;
+    use super::super::runtime::rt_type::RuntimeType;
+    use super::super::runtime::rt_data_type::RuntimeDataType;
+    use self::env::EnvDataType;
+    use self::txctx::TransactionContextType;
 
     #[test]
     fn test_data_field_to_index() {

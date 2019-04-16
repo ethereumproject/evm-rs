@@ -1,8 +1,5 @@
-use singletonum::{Singleton, SingletonInit};
 use inkwell::AddressSpace;
 use inkwell::types::BasicTypeEnum;
-use inkwell::attributes::Attribute;
-use inkwell::context::Context;
 use inkwell::builder::Builder;
 use inkwell::module::Module;
 use inkwell::values::FunctionValue;

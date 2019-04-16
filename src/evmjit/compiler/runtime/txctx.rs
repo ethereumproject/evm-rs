@@ -1,16 +1,15 @@
 #![allow(dead_code)]
+
+use std::ffi::CString;
+
 use inkwell::context::Context;
-use inkwell::builder::Builder;
-use inkwell::module::Module;
 use inkwell::types::StructType;
 use inkwell::types::PointerType;
 use inkwell::values::PointerValue;
 use inkwell::values::FunctionValue;
 use inkwell::module::Linkage::*;
 use inkwell::AddressSpace;
-use evmjit::compiler::runtime::env::EnvDataType;
 use llvm_sys::LLVMCallConv::*;
-use std::ffi::CString;
 
 use super::super::JITContext;
 
@@ -258,11 +257,13 @@ impl<'a> TransactionContextManager<'a> {
 #[cfg(test)]
 mod tests {
     //use std::ffi::CString;
-    use super::*;
     use inkwell::values::InstructionOpcode;
     use inkwell::values::BasicValue;
+
+    use super::*;
     use evmjit::compiler::evm_compiler::MainFuncCreator;
     use evmjit::GetOperandValue;
+    use evmjit::compiler::runtime::env::EnvDataType;
 
     #[test]
     fn test_tx_ctx_type() {
