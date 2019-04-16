@@ -13,9 +13,10 @@ static FRAME_ADDRESS_INTRINSIC_NAME: &str = "llvm.frameaddress";
 static SETJMP_INTRINSIC_NAME: &str = "llvm.eh.sjlj.setjmp";
 static LONGJMP_INTRINSIC_NAME: &str = "llvm.eh.sjlj.longjmp";
 static STACK_SAVE_INTRINSIC_NAME: &str = "llvm.stacksave";
-static BSWAP_I256_IINTRINSIC_NAME: &str = "llvm.bswap.i256";
-static BSWAP_I160_IINTRINSIC_NAME: &str = "llvm.bswap.i160";
-static CTLZ_I256_IINTRINSIC_NAME: &str = "llvm.ctlz.i256";
+static BSWAP_I64_INTRINSIC_NAME: &str = "llvm.bswap.i64";
+static BSWAP_I256_INTRINSIC_NAME: &str = "llvm.bswap.i256";
+static BSWAP_I160_INTRINSIC_NAME: &str = "llvm.bswap.i160";
+static CTLZ_I256_INTRINSIC_NAME: &str = "llvm.ctlz.i256";
 static MEMSET_I32_INTRINSIC_NAME: &str = "llvm.memset.p0i8.i32";
 static MEMSET_I64_INTRINSIC_NAME: &str = "llvm.memset.p0i8.i64";
 
@@ -43,10 +44,11 @@ impl LLVMIntrinsicManager for LLVMIntrinsic {
                 let arg = arg_type.unwrap();
                 assert!(arg.is_int_type());
                 let int_bit_width = arg.into_int_type().get_bit_width();
-                assert!(int_bit_width == 160 || int_bit_width == 256);
+                assert!(int_bit_width == 160 || int_bit_width == 256 || int_bit_width == 64);
                 match int_bit_width {
-                    160 => BSWAP_I160_IINTRINSIC_NAME,
-                    256 => BSWAP_I256_IINTRINSIC_NAME,
+                    160 => BSWAP_I160_INTRINSIC_NAME,
+                    256 => BSWAP_I256_INTRINSIC_NAME,
+                    64 => BSWAP_I64_INTRINSIC_NAME,
                     _ => panic!("LLVMIntrinsicManager::to_name: bad integer size for bswap"),
                 }
             },
@@ -58,7 +60,7 @@ impl LLVMIntrinsicManager for LLVMIntrinsic {
                 let int_bit_width = arg.into_int_type().get_bit_width();
                 assert!(int_bit_width == 256);
 
-                CTLZ_I256_IINTRINSIC_NAME
+                CTLZ_I256_INTRINSIC_NAME
             },
 
             LLVMIntrinsic::MemSet => {
@@ -309,6 +311,38 @@ mod tests {
         let arg1 = func_decl.get_first_param().unwrap();
         assert!(arg1.get_type().is_int_type());
         assert_eq!(arg1.get_type().into_int_type().get_bit_width(), 160);
+
+        let ret_t = addr_type;
+        assert_eq!(func_decl.get_return_type(), BasicTypeEnum::IntType(ret_t));
+        assert!(func_decl.get_linkage() == External);
+
+        let nounwind_attr = func_decl.get_enum_attribute(0, Attribute::get_named_enum_kind_id("nounwind"));
+        assert!(nounwind_attr != None);
+
+        let readnone_attr = func_decl.get_enum_attribute(0, Attribute::get_named_enum_kind_id("readnone"));
+        assert!(readnone_attr != None);
+
+        let speculatable_attr = func_decl.get_enum_attribute(0, Attribute::get_named_enum_kind_id("speculatable"));
+        assert!(speculatable_attr != None);
+    }
+
+    #[test]
+    fn test_intrinsic_bswap64_decl() {
+        let context = Context::create();
+        let module = context.create_module("evm_module");
+        let types_instance = EvmTypes::get_instance(&context);
+        let addr_type = types_instance.get_size_type();
+        let enum_addr_type = BasicTypeEnum::IntType(addr_type);
+        let func_decl = LLVMIntrinsic::Bswap.get_intrinsic_declaration(&context,
+                                                                       &module,
+                                                                       Some(enum_addr_type));
+        assert_eq!(func_decl.count_params(), 1);
+        let func_name = func_decl.get_name();
+        assert_eq!(func_name.to_str(), Ok(LLVMIntrinsic::Bswap.to_name(Some(enum_addr_type))));
+
+        let arg1 = func_decl.get_first_param().unwrap();
+        assert!(arg1.get_type().is_int_type());
+        assert_eq!(arg1.get_type().into_int_type().get_bit_width(), 64);
 
         let ret_t = addr_type;
         assert_eq!(func_decl.get_return_type(), BasicTypeEnum::IntType(ret_t));

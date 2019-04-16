@@ -331,9 +331,6 @@ impl<'a> MemoryRepresentation<'a> {
         MemoryRepresentationType::get_instance(self.m_context).get_type()
     }
 
-    // auto sizePtr = m_builder.CreateStructGEP(getType(), _array ? _array : m_array, 1, "sizePtr");
-    //	return m_builder.CreateLoad(sizePtr, "array.size");
-
     pub fn get_internal_mem_size(&self) -> BasicValueEnum {
         self.get_mem_size(self.m_memory)
     }
@@ -343,6 +340,16 @@ impl<'a> MemoryRepresentation<'a> {
             let size_ptr = self.m_builder.build_struct_gep(mem, 1, "sizePtr");
             self.m_builder.build_load(size_ptr, "mem.size")
         }
+    }
+
+    // llvm::Value* getPtr(llvm::Value* _arrayPtr, llvm::Value* _index) { return m_getPtrFunc.call(m_builder, {_arrayPtr, _index}); }
+
+    pub fn get_mem_ptr(&self, mem: PointerValue, index: IntValue) -> PointerValue {
+        let call_site = self.m_builder.build_call(self.m_func_mgr.get_evm_mem_ptr_func(),
+                                                  &[mem.into(), index.into()], "");
+        assert!(call_site.try_as_basic_value().left().is_some());
+        let ret = call_site.try_as_basic_value().left().unwrap();
+        ret.into_pointer_value()
     }
 
     pub fn extend_memory_size(&self, mem: PointerValue, size: IntValue) {
@@ -400,6 +407,10 @@ mod mem_rep_tests {
         assert!(module.get_function("mem.getPtr").is_none());
         let _mem_get_ptr_func = mem_rep.get_evm_mem_ptr_func();
         assert!(module.get_function("mem.getPtr").is_some());
+
+        assert!(module.get_function("mem.extend").is_none());
+        let _mem_extend_func = mem_rep.get_extend_func();
+        assert!(module.get_function("mem.extend").is_some());
     }
 
     #[test]
@@ -411,7 +422,7 @@ mod mem_rep_tests {
         let mem_rep = MemoryRepresentationFunctionManager::new(&context, &module, &external_func_mgr);
         let mem_get_ptr_func = mem_rep.get_evm_mem_ptr_func();
 
-        module.print_to_stderr();
+        //module.print_to_stderr();
 
         let attr_factory = LLVMAttributeFactory::get_instance(&context);
 
@@ -542,7 +553,7 @@ mod mem_rep_tests {
         let mem_rep = MemoryRepresentationFunctionManager::new(&context, &module, &external_func_mgr);
         let mem_get_extend_func = mem_rep.get_extend_func();
 
-        module.print_to_stderr();
+        //module.print_to_stderr();
 
         let attr_factory = LLVMAttributeFactory::get_instance(&context);
 
