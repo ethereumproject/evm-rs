@@ -1,16 +1,16 @@
 #![allow(dead_code)]
 
+use evmjit::compiler::external_declarations::ExternalFunctionManager;
+use evmjit::compiler::stack::EVM_MAX_STACK_SIZE;
 use inkwell::values::BasicValueEnum;
 use inkwell::values::PointerValue;
-use evmjit::compiler::stack::EVM_MAX_STACK_SIZE;
-use evmjit::compiler::external_declarations::ExternalFunctionManager;
 
 use super::super::JITContext;
 
 #[derive(Debug, Copy, Clone)]
 pub struct StackAllocator {
-    stack_base : BasicValueEnum,
-    stack_size_ptr : PointerValue,
+    stack_base: BasicValueEnum,
+    stack_size_ptr: PointerValue,
 }
 
 impl StackAllocator {
@@ -19,17 +19,17 @@ impl StackAllocator {
         let types_instance = context.evm_types();
 
         let malloc_func = decl_factory.get_malloc_decl();
-        
-        let malloc_size = (types_instance.get_word_type().get_bit_width() / 8) * EVM_MAX_STACK_SIZE;
-        let malloc_size_ir_value = context.llvm_context().i64_type().const_int (malloc_size as u64, false);
-        let base = builder.build_call (malloc_func, &[malloc_size_ir_value.into()], "stack_base");
 
-        let size_ptr = builder.build_alloca (types_instance.get_size_type(), "stack.size");
-        builder.build_store (size_ptr, context.llvm_context().i64_type().const_zero());
+        let malloc_size = (types_instance.get_word_type().get_bit_width() / 8) * EVM_MAX_STACK_SIZE;
+        let malloc_size_ir_value = context.llvm_context().i64_type().const_int(malloc_size as u64, false);
+        let base = builder.build_call(malloc_func, &[malloc_size_ir_value.into()], "stack_base");
+
+        let size_ptr = builder.build_alloca(types_instance.get_size_type(), "stack.size");
+        builder.build_store(size_ptr, context.llvm_context().i64_type().const_zero());
 
         StackAllocator {
             stack_base: base.try_as_basic_value().left().unwrap(),
-            stack_size_ptr: size_ptr
+            stack_size_ptr: size_ptr,
         }
     }
 
@@ -42,13 +42,12 @@ impl StackAllocator {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
-    use std::ffi::CString;
     use super::*;
-    use inkwell::values::InstructionOpcode;
     use inkwell::module::Linkage::External;
+    use inkwell::values::InstructionOpcode;
+    use std::ffi::CString;
 
     #[test]
     fn test_stack_allocator_new() {

@@ -62,12 +62,9 @@ impl LLVMAttributeFactory {
     pub fn attr_argmemonly(&self) -> &Attribute {
         &self.attr_argmemonly
     }
-
 }
 
-
 #[test]
-
 
 fn test_llvm_attribute_factory() {
     let context = Context::create();
@@ -108,5 +105,4 @@ fn test_llvm_attribute_factory() {
     assert!(argmemonly.is_enum());
     assert_eq!(argmemonly.get_enum_value(), 0);
     assert_ne!(argmemonly.get_enum_kind_id(), 0);
-
 }

@@ -1,7 +1,7 @@
 #![allow(dead_code)]
 
-use inkwell::values::PointerValue;
 use inkwell::basic_block::BasicBlock;
+use inkwell::values::PointerValue;
 use inkwell::IntPredicate;
 
 use super::intrinsics::LLVMIntrinsic;
@@ -13,8 +13,7 @@ pub struct ExceptionManager {
 }
 
 impl ExceptionManager {
-    pub fn new(context: &JITContext,
-               normal_path_bb: &BasicBlock, exception_bb: &BasicBlock) -> ExceptionManager {
+    pub fn new(context: &JITContext, normal_path_bb: &BasicBlock, exception_bb: &BasicBlock) -> ExceptionManager {
         let builder = context.builder();
         let llvm_ctx = context.llvm_context();
         let types_instance = context.evm_types();
@@ -22,43 +21,37 @@ impl ExceptionManager {
         let byte_ptr_t = types_instance.get_byte_ptr_type();
         let setjmp_words = builder.build_array_alloca(byte_ptr_t, buf_size, "jmpbuf.words");
 
-        let frame_addr_decl = LLVMIntrinsic::FrameAddress.get_intrinsic_declaration(context,
-                                                                                    None);
+        let frame_addr_decl = LLVMIntrinsic::FrameAddress.get_intrinsic_declaration(context, None);
 
         let i32_zero = llvm_ctx.i32_type().const_int(0, false);
 
         // Save frame pointer
-        let fp = builder.build_call (frame_addr_decl, &[i32_zero.into()], "fp");
+        let fp = builder.build_call(frame_addr_decl, &[i32_zero.into()], "fp");
         let fp_result_as_basic_val = fp.try_as_basic_value().left().unwrap();
         builder.build_store(setjmp_words, fp_result_as_basic_val);
 
-        let stack_save_decl = LLVMIntrinsic::StackSave.get_intrinsic_declaration(context,
-                                                                                 None);
+        let stack_save_decl = LLVMIntrinsic::StackSave.get_intrinsic_declaration(context, None);
 
         // Save stack pointer
-        let sp = builder.build_call (stack_save_decl, &[], "sp");
+        let sp = builder.build_call(stack_save_decl, &[], "sp");
         let sp_result_as_basic_val = sp.try_as_basic_value().left().unwrap();
-
 
         unsafe {
             let i64_two = llvm_ctx.i64_type().const_int(2, false);
             let jmp_buf_sp = builder.build_in_bounds_gep(setjmp_words, &[i64_two.into()], "jmpBuf.sp");
             builder.build_store(jmp_buf_sp, sp_result_as_basic_val);
 
-            let setjmp_decl = LLVMIntrinsic::SetJmp.get_intrinsic_declaration(context,
-                                                                              None);
-        
+            let setjmp_decl = LLVMIntrinsic::SetJmp.get_intrinsic_declaration(context, None);
+
             let jmp_buf = builder.build_pointer_cast(setjmp_words, byte_ptr_t, "jmpBuf");
             let setjmp_result = builder.build_call(setjmp_decl, &[jmp_buf.into()], "");
             let setjmp_result_as_int_val = setjmp_result.try_as_basic_value().left().unwrap().into_int_value();
 
-            let normal_path = builder.build_int_compare(IntPredicate::EQ,
-                                                        setjmp_result_as_int_val,
-                                                        i32_zero, "");
+            let normal_path = builder.build_int_compare(IntPredicate::EQ, setjmp_result_as_int_val, i32_zero, "");
             builder.build_conditional_branch(normal_path, &normal_path_bb, &exception_bb);
 
             ExceptionManager {
-                exception_dest: jmp_buf
+                exception_dest: jmp_buf,
             }
         }
     }
@@ -75,10 +68,10 @@ mod tests {
 
     use super::*;
     use evmjit::compiler::evm_compiler::MainFuncCreator;
-    use evmjit::compiler::runtime::RuntimeManager;
-    use evmjit::GetOperandValue;
-    use evmjit::GetOperandBasicBlock;
     use evmjit::compiler::external_declarations::ExternalFunctionManager;
+    use evmjit::compiler::runtime::RuntimeManager;
+    use evmjit::GetOperandBasicBlock;
+    use evmjit::GetOperandValue;
 
     #[test]
     fn test_exception_manager() {
@@ -90,7 +83,7 @@ mod tests {
         let builder = jitctx.builder();
 
         // Generate outline of main function needed by 'RuntimeTypeManager
-        let main_func = MainFuncCreator::new ("main", &jitctx);
+        let main_func = MainFuncCreator::new("main", &jitctx);
         let _runtime = RuntimeManager::new(&jitctx, &decl_factory);
 
         let normal_path_block = main_func.get_entry_bb().get_next_basic_block();
@@ -99,7 +92,7 @@ mod tests {
         let exception_block = main_func.get_abort_bb();
 
         // Create a basic block to put exception handler code in so we can test it independently
-        let main_fn_optional = module.get_function ("main");
+        let main_fn_optional = module.get_function("main");
         assert!(main_fn_optional != None);
         let main_fn = main_fn_optional.unwrap();
         let exception_handler_bb = context.append_basic_block(&main_fn, "exception_handler_bb");
@@ -182,17 +175,28 @@ mod tests {
 
         let sixth_insn_store_operand0 = sixth_insn.get_operand_value(0).unwrap();
         assert!(sixth_insn_store_operand0.is_pointer_value());
-        let sixth_insn_store_operand0_ptr_elt_t = sixth_insn_store_operand0.into_pointer_value().get_type().get_element_type();
+        let sixth_insn_store_operand0_ptr_elt_t = sixth_insn_store_operand0
+            .into_pointer_value()
+            .get_type()
+            .get_element_type();
         assert!(sixth_insn_store_operand0_ptr_elt_t.is_int_type());
         assert_eq!(sixth_insn_store_operand0_ptr_elt_t.into_int_type(), context.i8_type());
 
         let sixth_insn_store_operand1 = sixth_insn.get_operand_value(1).unwrap();
         assert!(sixth_insn_store_operand1.is_pointer_value());
-        let sixth_insn_store_operand1_ptr_elt_t = sixth_insn_store_operand1.into_pointer_value().get_type().get_element_type();
+        let sixth_insn_store_operand1_ptr_elt_t = sixth_insn_store_operand1
+            .into_pointer_value()
+            .get_type()
+            .get_element_type();
         assert!(sixth_insn_store_operand1_ptr_elt_t.is_pointer_type());
-        let sixth_insn_store_operand1_ptr_to_ptr_elt_t = sixth_insn_store_operand1_ptr_elt_t.into_pointer_type().get_element_type();
+        let sixth_insn_store_operand1_ptr_to_ptr_elt_t = sixth_insn_store_operand1_ptr_elt_t
+            .into_pointer_type()
+            .get_element_type();
         assert!(sixth_insn_store_operand1_ptr_to_ptr_elt_t.is_int_type());
-        assert_eq!(sixth_insn_store_operand1_ptr_to_ptr_elt_t.into_int_type(), context.i8_type());
+        assert_eq!(
+            sixth_insn_store_operand1_ptr_to_ptr_elt_t.into_int_type(),
+            context.i8_type()
+        );
 
         assert!(sixth_insn.get_next_instruction() != None);
 
@@ -219,7 +223,10 @@ mod tests {
 
         let eighth_insn_call_operand0 = eighth_insn.get_operand_value(0).unwrap();
         assert!(eighth_insn_call_operand0.is_pointer_value());
-        let eighth_insn_call_operand0_ptr_elt_t = eighth_insn_call_operand0.into_pointer_value().get_type().get_element_type();
+        let eighth_insn_call_operand0_ptr_elt_t = eighth_insn_call_operand0
+            .into_pointer_value()
+            .get_type()
+            .get_element_type();
         assert!(eighth_insn_call_operand0_ptr_elt_t.is_int_type());
         assert_eq!(eighth_insn_call_operand0_ptr_elt_t.into_int_type(), context.i8_type());
 
@@ -247,7 +254,5 @@ mod tests {
 
         let bb2 = tenth_insn.get_operand_as_bb(2).unwrap();
         assert_eq!(bb2.get_name().to_str(), Ok("Stop"));
-
     }
 }
-

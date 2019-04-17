@@ -2,8 +2,8 @@
 
 use std::cell::RefCell;
 
-use inkwell::values::FunctionValue;
 use inkwell::module::Linkage::*;
+use inkwell::values::FunctionValue;
 
 use super::JITContext;
 
@@ -28,9 +28,11 @@ impl<'a> ExternalFunctionManager<'a> {
         if self.malloc_decl.borrow().is_none() {
             let module = self.m_context.module();
             let types_instance = self.m_context.evm_types();
-            let malloc_fn_type = types_instance.get_word_ptr_type().fn_type(&[types_instance.get_size_type().into()], false);
+            let malloc_fn_type = types_instance
+                .get_word_ptr_type()
+                .fn_type(&[types_instance.get_size_type().into()], false);
 
-            let malloc_func = module.add_function ("malloc", malloc_fn_type, Some(External));
+            let malloc_func = module.add_function("malloc", malloc_fn_type, Some(External));
             let attr_factory = self.m_context.attributes();
 
             malloc_func.add_attribute(0, *attr_factory.attr_nounwind());
@@ -38,12 +40,10 @@ impl<'a> ExternalFunctionManager<'a> {
 
             *self.malloc_decl.borrow_mut() = Some(malloc_func);
             malloc_func
-        }
-        else {
+        } else {
             let decl = self.malloc_decl.borrow().unwrap();
             decl
         }
-
     }
 
     pub fn get_free_decl(&self) -> FunctionValue {
@@ -52,7 +52,10 @@ impl<'a> ExternalFunctionManager<'a> {
             let free_ret_type = self.m_context.llvm_context().void_type();
             let arg1 = types_instance.get_word_ptr_type();
             let free_func_type = free_ret_type.fn_type(&[arg1.into()], false);
-            let free_func = self.m_context.module().add_function("free", free_func_type, Some(External));
+            let free_func = self
+                .m_context
+                .module()
+                .add_function("free", free_func_type, Some(External));
 
             let attr_factory = self.m_context.attributes();
             free_func.add_attribute(0, *attr_factory.attr_nounwind());
@@ -60,8 +63,7 @@ impl<'a> ExternalFunctionManager<'a> {
 
             *self.free_decl.borrow_mut() = Some(free_func);
             free_func
-        }
-        else {
+        } else {
             let decl = self.free_decl.borrow().unwrap();
             decl
         }
@@ -75,7 +77,10 @@ impl<'a> ExternalFunctionManager<'a> {
             let arg2 = types_instance.get_size_type();
             let realloc_func_type = realloc_return_type.fn_type(&[arg1.into(), arg2.into()], false);
 
-            let realloc_func = self.m_context.module().add_function("realloc", realloc_func_type, Some(External));
+            let realloc_func = self
+                .m_context
+                .module()
+                .add_function("realloc", realloc_func_type, Some(External));
 
             let attr_factory = self.m_context.attributes();
             realloc_func.add_attribute(0, *attr_factory.attr_noalias());
@@ -83,15 +88,12 @@ impl<'a> ExternalFunctionManager<'a> {
             realloc_func.add_attribute(1, *attr_factory.attr_nocapture());
             *self.realloc_decl.borrow_mut() = Some(realloc_func);
             realloc_func
-
-        }
-        else {
+        } else {
             let decl = self.realloc_decl.borrow().unwrap();
             decl
         }
     }
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -105,7 +107,7 @@ mod tests {
     fn test_get_malloc_decl() {
         let jitctx = JITContext::new();
         let module = jitctx.module();
-        
+
         let evmtypes = jitctx.evm_types();
         let attr_factory = jitctx.attributes();
 
@@ -137,15 +139,21 @@ mod tests {
         let noalias_attr = malloc_func.get_enum_attribute(0, Attribute::get_named_enum_kind_id("noalias"));
         assert!(noalias_attr != None);
 
-        assert_eq!(attr_factory.attr_nounwind().get_enum_kind_id(), nounwind_attr.unwrap().get_enum_kind_id());
-        assert_eq!(attr_factory.attr_noalias().get_enum_kind_id(), noalias_attr.unwrap().get_enum_kind_id());
+        assert_eq!(
+            attr_factory.attr_nounwind().get_enum_kind_id(),
+            nounwind_attr.unwrap().get_enum_kind_id()
+        );
+        assert_eq!(
+            attr_factory.attr_noalias().get_enum_kind_id(),
+            noalias_attr.unwrap().get_enum_kind_id()
+        );
     }
 
     #[test]
     fn test_get_free_decl() {
         let jitctx = JITContext::new();
         let module = jitctx.module();
-        
+
         let evmtypes = jitctx.evm_types();
         let attr_factory = jitctx.attributes();
 
@@ -172,14 +180,19 @@ mod tests {
         assert!(area_to_be_freed_ptr_elt_t.is_int_type());
         assert_eq!(area_to_be_freed_ptr_elt_t.into_int_type(), evmtypes.get_word_type());
 
-
         let nounwind_attr = free_func.get_enum_attribute(0, Attribute::get_named_enum_kind_id("nounwind"));
         assert!(nounwind_attr != None);
-        assert_eq!(attr_factory.attr_nounwind().get_enum_kind_id(), nounwind_attr.unwrap().get_enum_kind_id());
+        assert_eq!(
+            attr_factory.attr_nounwind().get_enum_kind_id(),
+            nounwind_attr.unwrap().get_enum_kind_id()
+        );
 
         let nocapture_attr = free_func.get_enum_attribute(1, Attribute::get_named_enum_kind_id("nocapture"));
         assert!(nocapture_attr != None);
-        assert_eq!(attr_factory.attr_nocapture().get_enum_kind_id(), nocapture_attr.unwrap().get_enum_kind_id());
+        assert_eq!(
+            attr_factory.attr_nocapture().get_enum_kind_id(),
+            nocapture_attr.unwrap().get_enum_kind_id()
+        );
     }
 
     #[test]
@@ -205,14 +218,20 @@ mod tests {
 
         let old_memory_to_realloc_arg = realloc_func.get_nth_param(0).unwrap();
         assert!(old_memory_to_realloc_arg.is_pointer_value());
-        let elem_t = old_memory_to_realloc_arg.into_pointer_value().get_type().get_element_type();
+        let elem_t = old_memory_to_realloc_arg
+            .into_pointer_value()
+            .get_type()
+            .get_element_type();
         assert_eq!(elem_t.into_int_type(), evmtypes.get_byte_type());
 
         // Validate argument 2 type
 
         let new_memory_size_arg = realloc_func.get_nth_param(1).unwrap();
         assert!(new_memory_size_arg.is_int_value());
-        assert_eq!(new_memory_size_arg.into_int_value().get_type(), evmtypes.get_size_type());
+        assert_eq!(
+            new_memory_size_arg.into_int_value().get_type(),
+            evmtypes.get_size_type()
+        );
 
         // Validate return type
         let realloc_ret = realloc_func.get_return_type();
@@ -225,17 +244,26 @@ mod tests {
         let nounwind_attr = realloc_func.get_enum_attribute(0, Attribute::get_named_enum_kind_id("nounwind"));
         assert!(nounwind_attr != None);
 
-        assert_eq!(attr_factory.attr_nounwind().get_enum_kind_id(), nounwind_attr.unwrap().get_enum_kind_id());
+        assert_eq!(
+            attr_factory.attr_nounwind().get_enum_kind_id(),
+            nounwind_attr.unwrap().get_enum_kind_id()
+        );
 
         let noalias_attr = realloc_func.get_enum_attribute(0, Attribute::get_named_enum_kind_id("noalias"));
         assert!(noalias_attr != None);
 
-        assert_eq!(attr_factory.attr_noalias().get_enum_kind_id(), noalias_attr.unwrap().get_enum_kind_id());
+        assert_eq!(
+            attr_factory.attr_noalias().get_enum_kind_id(),
+            noalias_attr.unwrap().get_enum_kind_id()
+        );
 
         // Validate parameter attribute
         let nocapture_attr = realloc_func.get_enum_attribute(1, Attribute::get_named_enum_kind_id("nocapture"));
         assert!(nocapture_attr != None);
 
-        assert_eq!(attr_factory.attr_nocapture().get_enum_kind_id(), nocapture_attr.unwrap().get_enum_kind_id());
+        assert_eq!(
+            attr_factory.attr_nocapture().get_enum_kind_id(),
+            nocapture_attr.unwrap().get_enum_kind_id()
+        );
     }
 }

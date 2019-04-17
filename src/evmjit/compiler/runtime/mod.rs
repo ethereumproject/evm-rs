@@ -1,25 +1,25 @@
 #![allow(dead_code)]
 
 pub mod env;
-pub mod txctx;
-pub mod stack_init;
 pub mod rt_data_type;
 pub mod rt_type;
+pub mod stack_init;
+pub mod txctx;
 
-use inkwell::types::StructType;
-use inkwell::types::PointerType;
-use inkwell::values::BasicValueEnum;
-use inkwell::values::PointerValue;
-use inkwell::values::FunctionValue;
-use inkwell::basic_block::BasicBlock;
-use self::rt_type::RuntimeTypeManager;
-use self::rt_data_type::RuntimeDataTypeFields::Gas;
 use self::rt_data_type::RuntimeDataFieldToIndex;
-use self::txctx::TransactionContextManager;
+use self::rt_data_type::RuntimeDataTypeFields::Gas;
+use self::rt_type::RuntimeTypeManager;
 use self::stack_init::StackAllocator;
-use llvm_sys::LLVMCallConv::*;
-use evmjit::ModuleLookup;
+use self::txctx::TransactionContextManager;
 use evmjit::compiler::external_declarations::ExternalFunctionManager;
+use evmjit::ModuleLookup;
+use inkwell::basic_block::BasicBlock;
+use inkwell::types::PointerType;
+use inkwell::types::StructType;
+use inkwell::values::BasicValueEnum;
+use inkwell::values::FunctionValue;
+use inkwell::values::PointerValue;
+use llvm_sys::LLVMCallConv::*;
 
 use super::JITContext;
 
@@ -31,7 +31,7 @@ pub enum TransactionContextTypeFields {
     Number,
     TimeStamp,
     GasLimit,
-    Difficulty
+    Difficulty,
 }
 
 trait TransactionContextTypeFieldToIndex {
@@ -110,7 +110,9 @@ impl<'a> ReturnBufferManager<'a> {
 
     pub fn reset_return_buf(&self) {
         let const_factory = self.m_context.evm_constants();
-        self.m_context.builder().build_store(self.m_return_buf_size_ptr, const_factory.get_i64_zero());
+        self.m_context
+            .builder()
+            .build_store(self.m_return_buf_size_ptr, const_factory.get_i64_zero());
     }
 }
 
@@ -119,8 +121,14 @@ struct MainPrologue {
 }
 
 impl MainPrologue {
-    pub fn new(jitctx: &JITContext, rt_type_mgr: &RuntimeTypeManager, gas_mgr: &GasPtrManager,
-               main_func: FunctionValue, stack_base: BasicValueEnum, decl_factory: &ExternalFunctionManager) -> MainPrologue {
+    pub fn new(
+        jitctx: &JITContext,
+        rt_type_mgr: &RuntimeTypeManager,
+        gas_mgr: &GasPtrManager,
+        main_func: FunctionValue,
+        stack_base: BasicValueEnum,
+        decl_factory: &ExternalFunctionManager,
+    ) -> MainPrologue {
         let context = jitctx.llvm_context();
         let exit_bb = context.append_basic_block(&main_func, "Exit");
         let temp_builder = context.create_builder();
@@ -134,15 +142,13 @@ impl MainPrologue {
         temp_builder.build_call(free_func, &[stack_base.into()], "");
         let index = Gas.to_index() as u32;
         unsafe {
-            let ext_gas_ptr = temp_builder.build_struct_gep(rt_type_mgr.get_data_ptr().into_pointer_value(),
-                                                            index, "msg.gas.ptr");
+            let ext_gas_ptr =
+                temp_builder.build_struct_gep(rt_type_mgr.get_data_ptr().into_pointer_value(), index, "msg.gas.ptr");
             temp_builder.build_store(ext_gas_ptr, gas_mgr.get_gas());
             temp_builder.build_return(Some(&phi.as_basic_value()));
         }
 
-        MainPrologue {
-            m_exit_bb: exit_bb
-        }
+        MainPrologue { m_exit_bb: exit_bb }
     }
 
     pub fn get_exit_bb(&self) -> &BasicBlock {
@@ -152,7 +158,7 @@ impl MainPrologue {
 
 pub struct RuntimeManager<'a> {
     m_context: &'a JITContext,
-    m_txctx_manager:  TransactionContextManager<'a>,
+    m_txctx_manager: TransactionContextManager<'a>,
     m_rt_type_manager: RuntimeTypeManager<'a>,
     m_stack_allocator: StackAllocator,
     m_gas_ptr_manager: GasPtrManager<'a>,
@@ -180,9 +186,14 @@ impl<'a> RuntimeManager<'a> {
         let return_buf_mgr = ReturnBufferManager::new(jitctx);
         return_buf_mgr.reset_return_buf();
 
-        let prologue_manager = MainPrologue::new(jitctx, &rt_type_manager, &gas_ptr_mgr,
-                                                 main_func_opt.unwrap(), stack_allocator.get_stack_base_as_ir_value(),
-                                                    decl_factory);
+        let prologue_manager = MainPrologue::new(
+            jitctx,
+            &rt_type_manager,
+            &gas_ptr_mgr,
+            main_func_opt.unwrap(),
+            stack_allocator.get_stack_base_as_ir_value(),
+            decl_factory,
+        );
 
         RuntimeManager {
             m_context: jitctx,
@@ -195,25 +206,29 @@ impl<'a> RuntimeManager<'a> {
         }
     }
 
-    pub fn gen_tx_ctx_item_ir(&self, field : TransactionContextTypeFields) -> BasicValueEnum {
+    pub fn gen_tx_ctx_item_ir(&self, field: TransactionContextTypeFields) -> BasicValueEnum {
         let builder = self.m_context.builder();
-        let call = builder.build_call (self.m_txctx_manager.get_tx_ctx_fn_ssa_var(),
-                                              &[self.m_txctx_manager.get_tx_ctx_loaded_ssa_var().into(),
-                                                self.m_txctx_manager.get_tx_ctx_ssa_var().into(),
-                                                self.m_rt_type_manager.get_env_ptr().into()], "");
+        let call = builder.build_call(
+            self.m_txctx_manager.get_tx_ctx_fn_ssa_var(),
+            &[
+                self.m_txctx_manager.get_tx_ctx_loaded_ssa_var().into(),
+                self.m_txctx_manager.get_tx_ctx_ssa_var().into(),
+                self.m_rt_type_manager.get_env_ptr().into(),
+            ],
+            "",
+        );
         call.set_call_convention(LLVMFastCallConv as u32);
         let index = field.to_index();
 
         unsafe {
-            let mut ptr = builder.build_struct_gep(self.m_txctx_manager.get_tx_ctx_ssa_var(),
-                                                          index as u32, "");
+            let mut ptr = builder.build_struct_gep(self.m_txctx_manager.get_tx_ctx_ssa_var(), index as u32, "");
 
             // Origin and Coinbase are declared as arrays of 20 bytes (160 bits) to deal with alignment issues
             // Cast back to i160 pointer here
 
-            if field ==  TransactionContextTypeFields::Origin || field == TransactionContextTypeFields::CoinBase {
+            if field == TransactionContextTypeFields::Origin || field == TransactionContextTypeFields::CoinBase {
                 let types_instance = self.m_context.evm_types();
-                ptr = builder.build_pointer_cast (ptr, types_instance.get_address_ptr_type(), "");
+                ptr = builder.build_pointer_cast(ptr, types_instance.get_address_ptr_type(), "");
             }
 
             builder.build_load(ptr, "")
@@ -263,7 +278,6 @@ impl<'a> RuntimeManager<'a> {
 
     pub fn get_mem_ptr(&self) -> PointerValue {
         self.m_rt_type_manager.get_mem_ptr()
-
     }
 }
 
@@ -271,16 +285,16 @@ impl<'a> RuntimeManager<'a> {
 mod runtime_tests {
     use std::ffi::CString;
 
-    use inkwell::values::InstructionOpcode;
     use inkwell::module::Linkage::External;
+    use inkwell::values::InstructionOpcode;
 
-    use evmjit::GetOperandValue;
-    use evmjit::compiler::evm_compiler::MainFuncCreator;
-    use super::*;
-    use super::super::runtime::rt_type::RuntimeType;
-    use super::super::runtime::rt_data_type::RuntimeDataType;
     use self::env::EnvDataType;
     use self::txctx::TransactionContextType;
+    use super::super::runtime::rt_data_type::RuntimeDataType;
+    use super::super::runtime::rt_type::RuntimeType;
+    use super::*;
+    use evmjit::compiler::evm_compiler::MainFuncCreator;
+    use evmjit::GetOperandValue;
 
     #[test]
     fn test_data_field_to_index() {
@@ -299,7 +313,7 @@ mod runtime_tests {
         let decl_factory = ExternalFunctionManager::new(&jitctx);
 
         // Generate outline of main function needed by 'RuntimeTypeManager
-        MainFuncCreator::new ("main", &jitctx);
+        MainFuncCreator::new("main", &jitctx);
 
         //let manager = RuntimeManager::new("main", &context, &builder, &module);
         let manager = RuntimeManager::new(&jitctx, &decl_factory);
@@ -321,14 +335,14 @@ mod runtime_tests {
         let decl_factory = ExternalFunctionManager::new(&jitctx);
 
         // Generate outline of main function needed by 'RuntimeTypeManager
-        MainFuncCreator::new ("main", &jitctx);
+        MainFuncCreator::new("main", &jitctx);
 
         // Generate IR for runtime type related items
-        let rt_type_manager = RuntimeManager::new (&jitctx, &decl_factory);
+        let rt_type_manager = RuntimeManager::new(&jitctx, &decl_factory);
 
         // Create dummy function
 
-        let main_fn_optional = module.get_function ("main");
+        let main_fn_optional = module.get_function("main");
         assert!(main_fn_optional != None);
 
         let main_fn = main_fn_optional.unwrap();
@@ -366,7 +380,6 @@ mod runtime_tests {
 
         assert!(third_insn.get_next_instruction() == None);
     }
-
 
     #[test]
     fn test_return_buffer_manager() {
@@ -422,11 +435,11 @@ mod runtime_tests {
         let decl_factory = ExternalFunctionManager::new(&jitctx);
 
         // Need to create main function before TransactionConextManager otherwise we will crash
-        MainFuncCreator::new ("main", &jitctx);
+        MainFuncCreator::new("main", &jitctx);
 
         let manager = RuntimeManager::new(&jitctx, &decl_factory);
 
-        let main_fn_optional = module.get_function ("main");
+        let main_fn_optional = module.get_function("main");
         assert!(main_fn_optional != None);
 
         let main_fn = main_fn_optional.unwrap();
@@ -444,21 +457,23 @@ mod runtime_tests {
 
         let call_operand0 = first_insn.get_operand_value(0).unwrap();
 
-        assert!(call_operand0.is_pointer_value());   // should be i1 *
+        assert!(call_operand0.is_pointer_value()); // should be i1 *
         let call_operand0_ptr_elt_t = call_operand0.into_pointer_value().get_type().get_element_type();
         assert!(call_operand0_ptr_elt_t.is_int_type());
         assert!(call_operand0_ptr_elt_t.into_int_type().get_bit_width() == 1);
 
         let call_operand1 = first_insn.get_operand_value(1).unwrap();
 
-        assert!(call_operand1.is_pointer_value());   // should be evm.txctx *
+        assert!(call_operand1.is_pointer_value()); // should be evm.txctx *
 
         let call_operand1_ptr_elt_t = call_operand1.into_pointer_value().get_type().get_element_type();
         assert!(call_operand1_ptr_elt_t.is_struct_type());
-        assert!(TransactionContextType::is_transaction_context_type(&call_operand1_ptr_elt_t.as_struct_type()));
+        assert!(TransactionContextType::is_transaction_context_type(
+            &call_operand1_ptr_elt_t.as_struct_type()
+        ));
 
         let call_operand2 = first_insn.get_operand_value(2).unwrap();
-        assert!(call_operand2.is_pointer_value());   // should be Env *
+        assert!(call_operand2.is_pointer_value()); // should be Env *
 
         let call_operand2_ptr_elt_t = call_operand2.into_pointer_value().get_type().get_element_type();
         assert!(call_operand2_ptr_elt_t.is_struct_type());
@@ -509,10 +524,10 @@ mod runtime_tests {
         let decl_factory = ExternalFunctionManager::new(&jitctx);
 
         // Need to create main function before TransactionConextManager otherwise we will crash
-        MainFuncCreator::new ("main", &jitctx);
+        MainFuncCreator::new("main", &jitctx);
         let manager = RuntimeManager::new(&jitctx, &decl_factory);
 
-        let main_fn_optional = module.get_function ("main");
+        let main_fn_optional = module.get_function("main");
         assert!(main_fn_optional != None);
 
         let main_fn = main_fn_optional.unwrap();
@@ -530,21 +545,23 @@ mod runtime_tests {
 
         let call_operand0 = first_insn.get_operand_value(0).unwrap();
 
-        assert!(call_operand0.is_pointer_value());   // should be i1 *
+        assert!(call_operand0.is_pointer_value()); // should be i1 *
         let call_operand0_ptr_elt_t = call_operand0.into_pointer_value().get_type().get_element_type();
         assert!(call_operand0_ptr_elt_t.is_int_type());
         assert!(call_operand0_ptr_elt_t.into_int_type().get_bit_width() == 1);
 
         let call_operand1 = first_insn.get_operand_value(1).unwrap();
 
-        assert!(call_operand1.is_pointer_value());   // should be evm.txctx *
+        assert!(call_operand1.is_pointer_value()); // should be evm.txctx *
 
         let call_operand1_ptr_elt_t = call_operand1.into_pointer_value().get_type().get_element_type();
         assert!(call_operand1_ptr_elt_t.is_struct_type());
-        assert!(TransactionContextType::is_transaction_context_type(&call_operand1_ptr_elt_t.as_struct_type()));
+        assert!(TransactionContextType::is_transaction_context_type(
+            &call_operand1_ptr_elt_t.as_struct_type()
+        ));
 
         let call_operand2 = first_insn.get_operand_value(2).unwrap();
-        assert!(call_operand2.is_pointer_value());   // should be Env *
+        assert!(call_operand2.is_pointer_value()); // should be Env *
 
         let call_operand2_ptr_elt_t = call_operand2.into_pointer_value().get_type().get_element_type();
         assert!(call_operand2_ptr_elt_t.is_struct_type());
@@ -599,11 +616,11 @@ mod runtime_tests {
         let decl_factory = ExternalFunctionManager::new(&jitctx);
 
         // Need to create main function before TransactionConextManager otherwise we will crash
-        MainFuncCreator::new ("main", &jitctx);
+        MainFuncCreator::new("main", &jitctx);
 
         let manager = RuntimeManager::new(&jitctx, &decl_factory);
 
-        let main_fn_optional = module.get_function ("main");
+        let main_fn_optional = module.get_function("main");
         assert!(main_fn_optional != None);
 
         let main_fn = main_fn_optional.unwrap();
@@ -621,21 +638,23 @@ mod runtime_tests {
 
         let call_operand0 = first_insn.get_operand_value(0).unwrap();
 
-        assert!(call_operand0.is_pointer_value());   // should be i1 *
+        assert!(call_operand0.is_pointer_value()); // should be i1 *
         let call_operand0_ptr_elt_t = call_operand0.into_pointer_value().get_type().get_element_type();
         assert!(call_operand0_ptr_elt_t.is_int_type());
         assert!(call_operand0_ptr_elt_t.into_int_type().get_bit_width() == 1);
 
         let call_operand1 = first_insn.get_operand_value(1).unwrap();
 
-        assert!(call_operand1.is_pointer_value());   // should be evm.txctx *
+        assert!(call_operand1.is_pointer_value()); // should be evm.txctx *
 
         let call_operand1_ptr_elt_t = call_operand1.into_pointer_value().get_type().get_element_type();
         assert!(call_operand1_ptr_elt_t.is_struct_type());
-        assert!(TransactionContextType::is_transaction_context_type(&call_operand1_ptr_elt_t.as_struct_type()));
+        assert!(TransactionContextType::is_transaction_context_type(
+            &call_operand1_ptr_elt_t.as_struct_type()
+        ));
 
         let call_operand2 = first_insn.get_operand_value(2).unwrap();
-        assert!(call_operand2.is_pointer_value());   // should be Env *
+        assert!(call_operand2.is_pointer_value()); // should be Env *
 
         let call_operand2_ptr_elt_t = call_operand2.into_pointer_value().get_type().get_element_type();
         assert!(call_operand2_ptr_elt_t.is_struct_type());
@@ -690,11 +709,11 @@ mod runtime_tests {
         let decl_factory = ExternalFunctionManager::new(&jitctx);
 
         // Need to create main function before TransactionConextManager otherwise we will crash
-        MainFuncCreator::new ("main", &jitctx);
+        MainFuncCreator::new("main", &jitctx);
 
         let manager = RuntimeManager::new(&jitctx, &decl_factory);
 
-        let main_fn_optional = module.get_function ("main");
+        let main_fn_optional = module.get_function("main");
         assert!(main_fn_optional != None);
 
         let main_fn = main_fn_optional.unwrap();
@@ -712,21 +731,23 @@ mod runtime_tests {
 
         let call_operand0 = first_insn.get_operand_value(0).unwrap();
 
-        assert!(call_operand0.is_pointer_value());   // should be i1 *
+        assert!(call_operand0.is_pointer_value()); // should be i1 *
         let call_operand0_ptr_elt_t = call_operand0.into_pointer_value().get_type().get_element_type();
         assert!(call_operand0_ptr_elt_t.is_int_type());
         assert!(call_operand0_ptr_elt_t.into_int_type().get_bit_width() == 1);
 
         let call_operand1 = first_insn.get_operand_value(1).unwrap();
 
-        assert!(call_operand1.is_pointer_value());   // should be evm.txctx *
+        assert!(call_operand1.is_pointer_value()); // should be evm.txctx *
 
         let call_operand1_ptr_elt_t = call_operand1.into_pointer_value().get_type().get_element_type();
         assert!(call_operand1_ptr_elt_t.is_struct_type());
-        assert!(TransactionContextType::is_transaction_context_type(&call_operand1_ptr_elt_t.as_struct_type()));
+        assert!(TransactionContextType::is_transaction_context_type(
+            &call_operand1_ptr_elt_t.as_struct_type()
+        ));
 
         let call_operand2 = first_insn.get_operand_value(2).unwrap();
-        assert!(call_operand2.is_pointer_value());   // should be Env *
+        assert!(call_operand2.is_pointer_value()); // should be Env *
 
         let call_operand2_ptr_elt_t = call_operand2.into_pointer_value().get_type().get_element_type();
         assert!(call_operand2_ptr_elt_t.is_struct_type());
@@ -777,11 +798,11 @@ mod runtime_tests {
         let decl_factory = ExternalFunctionManager::new(&jitctx);
 
         // Need to create main function before TransactionConextManager otherwise we will crash
-        MainFuncCreator::new ("main", &jitctx);
+        MainFuncCreator::new("main", &jitctx);
 
         let manager = RuntimeManager::new(&jitctx, &decl_factory);
 
-        let main_fn_optional = module.get_function ("main");
+        let main_fn_optional = module.get_function("main");
         assert!(main_fn_optional != None);
 
         let main_fn = main_fn_optional.unwrap();
@@ -799,21 +820,23 @@ mod runtime_tests {
 
         let call_operand0 = first_insn.get_operand_value(0).unwrap();
 
-        assert!(call_operand0.is_pointer_value());   // should be i1 *
+        assert!(call_operand0.is_pointer_value()); // should be i1 *
         let call_operand0_ptr_elt_t = call_operand0.into_pointer_value().get_type().get_element_type();
         assert!(call_operand0_ptr_elt_t.is_int_type());
         assert!(call_operand0_ptr_elt_t.into_int_type().get_bit_width() == 1);
 
         let call_operand1 = first_insn.get_operand_value(1).unwrap();
 
-        assert!(call_operand1.is_pointer_value());   // should be evm.txctx *
+        assert!(call_operand1.is_pointer_value()); // should be evm.txctx *
 
         let call_operand1_ptr_elt_t = call_operand1.into_pointer_value().get_type().get_element_type();
         assert!(call_operand1_ptr_elt_t.is_struct_type());
-        assert!(TransactionContextType::is_transaction_context_type(&call_operand1_ptr_elt_t.as_struct_type()));
+        assert!(TransactionContextType::is_transaction_context_type(
+            &call_operand1_ptr_elt_t.as_struct_type()
+        ));
 
         let call_operand2 = first_insn.get_operand_value(2).unwrap();
-        assert!(call_operand2.is_pointer_value());   // should be Env *
+        assert!(call_operand2.is_pointer_value()); // should be Env *
 
         let call_operand2_ptr_elt_t = call_operand2.into_pointer_value().get_type().get_element_type();
         assert!(call_operand2_ptr_elt_t.is_struct_type());
@@ -864,11 +887,11 @@ mod runtime_tests {
         let decl_factory = ExternalFunctionManager::new(&jitctx);
 
         // Need to create main function before TransactionConextManager otherwise we will crash
-        MainFuncCreator::new ("main", &jitctx);
+        MainFuncCreator::new("main", &jitctx);
 
         let manager = RuntimeManager::new(&jitctx, &decl_factory);
 
-        let main_fn_optional = module.get_function ("main");
+        let main_fn_optional = module.get_function("main");
         assert!(main_fn_optional != None);
 
         let main_fn = main_fn_optional.unwrap();
@@ -886,21 +909,23 @@ mod runtime_tests {
 
         let call_operand0 = first_insn.get_operand_value(0).unwrap();
 
-        assert!(call_operand0.is_pointer_value());   // should be i1 *
+        assert!(call_operand0.is_pointer_value()); // should be i1 *
         let call_operand0_ptr_elt_t = call_operand0.into_pointer_value().get_type().get_element_type();
         assert!(call_operand0_ptr_elt_t.is_int_type());
         assert!(call_operand0_ptr_elt_t.into_int_type().get_bit_width() == 1);
 
         let call_operand1 = first_insn.get_operand_value(1).unwrap();
 
-        assert!(call_operand1.is_pointer_value());   // should be evm.txctx *
+        assert!(call_operand1.is_pointer_value()); // should be evm.txctx *
 
         let call_operand1_ptr_elt_t = call_operand1.into_pointer_value().get_type().get_element_type();
         assert!(call_operand1_ptr_elt_t.is_struct_type());
-        assert!(TransactionContextType::is_transaction_context_type(&call_operand1_ptr_elt_t.as_struct_type()));
+        assert!(TransactionContextType::is_transaction_context_type(
+            &call_operand1_ptr_elt_t.as_struct_type()
+        ));
 
         let call_operand2 = first_insn.get_operand_value(2).unwrap();
-        assert!(call_operand2.is_pointer_value());   // should be Env *
+        assert!(call_operand2.is_pointer_value()); // should be Env *
 
         let call_operand2_ptr_elt_t = call_operand2.into_pointer_value().get_type().get_element_type();
         assert!(call_operand2_ptr_elt_t.is_struct_type());
@@ -951,11 +976,11 @@ mod runtime_tests {
         let decl_factory = ExternalFunctionManager::new(&jitctx);
 
         // Need to create main function before TransactionConextManager otherwise we will crash
-        MainFuncCreator::new ("main", &jitctx);
+        MainFuncCreator::new("main", &jitctx);
 
         let manager = RuntimeManager::new(&jitctx, &decl_factory);
 
-        let main_fn_optional = module.get_function ("main");
+        let main_fn_optional = module.get_function("main");
         assert!(main_fn_optional != None);
 
         let main_fn = main_fn_optional.unwrap();
@@ -973,21 +998,23 @@ mod runtime_tests {
 
         let call_operand0 = first_insn.get_operand_value(0).unwrap();
 
-        assert!(call_operand0.is_pointer_value());   // should be i1 *
+        assert!(call_operand0.is_pointer_value()); // should be i1 *
         let call_operand0_ptr_elt_t = call_operand0.into_pointer_value().get_type().get_element_type();
         assert!(call_operand0_ptr_elt_t.is_int_type());
         assert!(call_operand0_ptr_elt_t.into_int_type().get_bit_width() == 1);
 
         let call_operand1 = first_insn.get_operand_value(1).unwrap();
 
-        assert!(call_operand1.is_pointer_value());   // should be evm.txctx *
+        assert!(call_operand1.is_pointer_value()); // should be evm.txctx *
 
         let call_operand1_ptr_elt_t = call_operand1.into_pointer_value().get_type().get_element_type();
         assert!(call_operand1_ptr_elt_t.is_struct_type());
-        assert!(TransactionContextType::is_transaction_context_type(&call_operand1_ptr_elt_t.as_struct_type()));
+        assert!(TransactionContextType::is_transaction_context_type(
+            &call_operand1_ptr_elt_t.as_struct_type()
+        ));
 
         let call_operand2 = first_insn.get_operand_value(2).unwrap();
-        assert!(call_operand2.is_pointer_value());   // should be Env *
+        assert!(call_operand2.is_pointer_value()); // should be Env *
 
         let call_operand2_ptr_elt_t = call_operand2.into_pointer_value().get_type().get_element_type();
         assert!(call_operand2_ptr_elt_t.is_struct_type());
@@ -1030,4 +1057,3 @@ mod runtime_tests {
     }
 
 }
-

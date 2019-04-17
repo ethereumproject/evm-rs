@@ -1,21 +1,21 @@
-use inkwell::AddressSpace;
-use inkwell::types::BasicTypeEnum;
+use inkwell::basic_block::BasicBlock;
 use inkwell::builder::Builder;
 use inkwell::module::Module;
+use inkwell::types::BasicTypeEnum;
+use inkwell::values::BasicValueEnum;
 use inkwell::values::FunctionValue;
 use inkwell::values::InstructionValue;
-use inkwell::values::BasicValueEnum;
-use inkwell::basic_block::BasicBlock;
+use inkwell::AddressSpace;
 
 pub mod compiler;
 
 pub trait ModuleLookup {
-    fn in_main_function(&self, builder: & Builder) -> bool;
-    fn get_main_function(&self, builder: & Builder) -> Option<FunctionValue>;
+    fn in_main_function(&self, builder: &Builder) -> bool;
+    fn get_main_function(&self, builder: &Builder) -> Option<FunctionValue>;
 }
 
 impl ModuleLookup for Module {
-    fn get_main_function(&self, builder: & Builder) -> Option<FunctionValue> {
+    fn get_main_function(&self, builder: &Builder) -> Option<FunctionValue> {
         // The parent of the first basic block is a function
 
         let bb = builder.get_insert_block();
@@ -31,13 +31,12 @@ impl ModuleLookup for Module {
 
         if found_func_val == main_func.unwrap() {
             found_func
-        }
-        else {
+        } else {
             None
         }
     }
 
-    fn in_main_function(&self, builder: & Builder) -> bool {
+    fn in_main_function(&self, builder: &Builder) -> bool {
         if self.get_main_function(builder) != None {
             true
         } else {
@@ -77,7 +76,7 @@ impl GetOperandBasicBlock for InstructionValue {
 }
 
 pub trait FindBasicBlock {
-    fn find_bb(&self, name : &str) -> Option<BasicBlock>;
+    fn find_bb(&self, name: &str) -> Option<BasicBlock>;
 }
 
 pub trait BasicTypeEnumCompare {
@@ -93,8 +92,8 @@ pub trait BasicTypeEnumCompare {
     fn is_ptr_to_int256(self) -> bool;
     fn is_ptr_to_struct(self) -> bool;
     fn is_array_t(self) -> bool;
-    fn is_array_of_len_n(self, len:u32) -> bool;
-    fn is_int8_array(self, len:u32) -> bool;
+    fn is_array_of_len_n(self, len: u32) -> bool;
+    fn is_int8_array(self, len: u32) -> bool;
 }
 
 impl BasicTypeEnumCompare for BasicTypeEnum {
@@ -127,8 +126,7 @@ impl BasicTypeEnumCompare for BasicTypeEnum {
     }
 
     fn is_ptr_type(self) -> bool {
-        self.is_pointer_type() &&
-        (self.as_pointer_type().get_address_space() == AddressSpace::Generic)
+        self.is_pointer_type() && (self.as_pointer_type().get_address_space() == AddressSpace::Generic)
     }
 
     fn is_ptr_to_int8(self) -> bool {
@@ -162,13 +160,13 @@ impl BasicTypeEnumCompare for BasicTypeEnum {
         self.is_array_type()
     }
 
-    fn is_array_of_len_n(self, len : u32) -> bool {
+    fn is_array_of_len_n(self, len: u32) -> bool {
         self.is_array_type() && (self.into_array_type().len() == len)
     }
 
-    fn is_int8_array(self, len : u32) -> bool {
-        self.is_array_of_len_n (len) &&
-        self.into_array_type().get_element_type().is_int_type() &&
-        (self.into_int_type().get_bit_width() == len)
+    fn is_int8_array(self, len: u32) -> bool {
+        self.is_array_of_len_n(len)
+            && self.into_array_type().get_element_type().is_int_type()
+            && (self.into_int_type().get_bit_width() == len)
     }
 }
