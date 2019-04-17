@@ -1,21 +1,21 @@
 #![allow(dead_code)]
-use std::ffi::CString;
-use inkwell::context::Context;
-use inkwell::types::StructType;
-use inkwell::types::PointerType;
-use inkwell::values::PointerValue;
-use inkwell::AddressSpace;
-use evmjit::BasicTypeEnumCompare;
-use std::cell::RefCell;
-use inkwell::module::Linkage::*;
-use inkwell::values::FunctionValue;
 use evmjit::compiler::external_declarations::ExternalFunctionManager;
-use inkwell::types::IntType;
-use inkwell::types::BasicTypeEnum;
 use evmjit::compiler::intrinsics::LLVMIntrinsic;
 use evmjit::compiler::intrinsics::LLVMIntrinsicManager;
+use evmjit::BasicTypeEnumCompare;
+use inkwell::context::Context;
+use inkwell::module::Linkage::*;
+use inkwell::types::BasicTypeEnum;
+use inkwell::types::IntType;
+use inkwell::types::PointerType;
+use inkwell::types::StructType;
 use inkwell::values::BasicValueEnum;
+use inkwell::values::FunctionValue;
 use inkwell::values::IntValue;
+use inkwell::values::PointerValue;
+use inkwell::AddressSpace;
+use std::cell::RefCell;
+use std::ffi::CString;
 
 use super::super::JITContext;
 
@@ -26,7 +26,7 @@ use super::super::JITContext;
 pub struct MemoryRepresentationType {
     memory_type: StructType,
     memory_ptr_type: PointerType,
-    memory_array_type: PointerType
+    memory_array_type: PointerType,
 }
 
 impl MemoryRepresentationType {
@@ -36,17 +36,15 @@ impl MemoryRepresentationType {
 
         let size_t = context.i64_type();
 
-        let fields = [evm_word_ptr_t.into(),
-                      size_t.into(),
-                      size_t.into()];
+        let fields = [evm_word_ptr_t.into(), size_t.into(), size_t.into()];
 
         let mem_struct = context.opaque_struct_type("LinearMemory");
         mem_struct.set_body(&fields, false);
-        
+
         MemoryRepresentationType {
             memory_type: mem_struct,
             memory_ptr_type: mem_struct.ptr_type(AddressSpace::Generic),
-            memory_array_type: evm_word_ptr_t
+            memory_array_type: evm_word_ptr_t,
         }
     }
 
@@ -99,7 +97,6 @@ impl MemoryRepresentationType {
         }
 
         true
-
     }
 }
 
@@ -109,16 +106,19 @@ pub struct MemoryRepresentationFunctionManager<'a> {
     m_context: &'a JITContext,
     m_evm_mem_ptr_func: RefCell<Option<FunctionValue>>,
     m_evm_mem_extend_func: RefCell<Option<FunctionValue>>,
-    m_external_func_mgr: &'a ExternalFunctionManager<'a>
+    m_external_func_mgr: &'a ExternalFunctionManager<'a>,
 }
 
 impl<'a> MemoryRepresentationFunctionManager<'a> {
-    pub fn new(context: &'a JITContext, external_func_mgr: &'a ExternalFunctionManager) -> MemoryRepresentationFunctionManager<'a> {
+    pub fn new(
+        context: &'a JITContext,
+        external_func_mgr: &'a ExternalFunctionManager,
+    ) -> MemoryRepresentationFunctionManager<'a> {
         MemoryRepresentationFunctionManager {
             m_context: context,
             m_evm_mem_ptr_func: RefCell::new(None),
             m_evm_mem_extend_func: RefCell::new(None),
-            m_external_func_mgr: external_func_mgr
+            m_external_func_mgr: external_func_mgr,
         }
     }
 
@@ -132,7 +132,10 @@ impl<'a> MemoryRepresentationFunctionManager<'a> {
             let arg2 = types_instance.get_size_type();
 
             let extend_evm_mem_fn_type = ret_type.fn_type(&[arg1.into(), arg2.into()], false);
-            let extend_evm_mem_func = self.m_context.module().add_function ("mem.extend", extend_evm_mem_fn_type, Some(Private));
+            let extend_evm_mem_func =
+                self.m_context
+                    .module()
+                    .add_function("mem.extend", extend_evm_mem_fn_type, Some(Private));
             let attr_factory = self.m_context.attributes();
 
             extend_evm_mem_func.add_attribute(0, *attr_factory.attr_nounwind());
@@ -153,8 +156,11 @@ impl<'a> MemoryRepresentationFunctionManager<'a> {
 
             temp_builder.position_at_end(&entry_bb);
 
-            let data_ptr = temp_builder.build_bitcast(evm_mem_ptr.into_pointer_value(),
-                                                      types_instance.get_byte_ptr_type().ptr_type(AddressSpace::Generic), "dataPtr");
+            let data_ptr = temp_builder.build_bitcast(
+                evm_mem_ptr.into_pointer_value(),
+                types_instance.get_byte_ptr_type().ptr_type(AddressSpace::Generic),
+                "dataPtr",
+            );
 
             unsafe {
                 let gep_arg1 = evm_mem_ptr.into_pointer_value();
@@ -174,7 +180,11 @@ impl<'a> MemoryRepresentationFunctionManager<'a> {
 
                 //    //	auto extSize = m_builder.CreateNUWSub(newSize, size, "extSize");
 
-                let extended_size = temp_builder.build_int_nuw_sub(requested_size.into_int_value(), current_size.into_int_value(), "extendedSize");
+                let extended_size = temp_builder.build_int_nuw_sub(
+                    requested_size.into_int_value(),
+                    current_size.into_int_value(),
+                    "extendedSize",
+                );
 
                 let realloc_func = self.m_external_func_mgr.get_realloc_decl();
                 let alloc_mem = temp_builder.build_call(realloc_func, &[data.into(), extended_size.into()], "newMem");
@@ -183,15 +193,21 @@ impl<'a> MemoryRepresentationFunctionManager<'a> {
 
                 let mem_ptr = temp_builder.build_gep(alloc_mem_as_ptr, &[extended_size], "extPtr");
 
-
-                let memset_arg = BasicTypeEnum::IntType (IntType::i64_type());
-                let memset_func = LLVMIntrinsic::MemSet.get_intrinsic_declaration(self.m_context,
-                                                                               Some(memset_arg));
+                let memset_arg = BasicTypeEnum::IntType(IntType::i64_type());
+                let memset_func = LLVMIntrinsic::MemSet.get_intrinsic_declaration(self.m_context, Some(memset_arg));
                 let zero_int_8 = context.i8_type().const_zero();
                 let bool_false = context.bool_type().const_zero();
 
-
-                temp_builder.build_call(memset_func, &[mem_ptr.into(), zero_int_8.into(), extended_size.into(), bool_false.into()], "");
+                temp_builder.build_call(
+                    memset_func,
+                    &[
+                        mem_ptr.into(),
+                        zero_int_8.into(),
+                        extended_size.into(),
+                        bool_false.into(),
+                    ],
+                    "",
+                );
 
                 //  auto newData = m_reallocFunc.call(m_builder, {data, newSize}, "newData"); // TODO: Check realloc result for null
                 //    //	auto extPtr = m_builder.CreateGEP(newData, size, "extPtr");
@@ -214,8 +230,7 @@ impl<'a> MemoryRepresentationFunctionManager<'a> {
 
             *self.m_evm_mem_extend_func.borrow_mut() = Some(extend_evm_mem_func);
             extend_evm_mem_func
-        }
-        else {
+        } else {
             let func = self.m_evm_mem_extend_func.borrow().unwrap();
             func
         }
@@ -223,15 +238,19 @@ impl<'a> MemoryRepresentationFunctionManager<'a> {
 
     pub fn get_evm_mem_ptr_func(&self) -> FunctionValue {
         if self.m_evm_mem_ptr_func.borrow().is_none() {
-
             // First create function declaration
 
             let types_instance = self.m_context.evm_types();
             let arg1 = self.m_context.memrep().get_ptr_type();
             let arg2 = types_instance.get_size_type();
-            let evm_mem_ptr_fn_type = types_instance.get_word_ptr_type().fn_type(&[arg1.into(), arg2.into()], false);
+            let evm_mem_ptr_fn_type = types_instance
+                .get_word_ptr_type()
+                .fn_type(&[arg1.into(), arg2.into()], false);
 
-            let evm_mem_func = self.m_context.module().add_function ("mem.getPtr", evm_mem_ptr_fn_type, Some(Private));
+            let evm_mem_func = self
+                .m_context
+                .module()
+                .add_function("mem.getPtr", evm_mem_ptr_fn_type, Some(Private));
             let attr_factory = self.m_context.attributes();
 
             evm_mem_func.add_attribute(0, *attr_factory.attr_nounwind());
@@ -248,12 +267,18 @@ impl<'a> MemoryRepresentationFunctionManager<'a> {
             // Now build function body IR
 
             let temp_builder = self.m_context.llvm_context().create_builder();
-            let entry_bb = self.m_context.llvm_context().append_basic_block(&evm_mem_func, "mem_ptr_entry");
+            let entry_bb = self
+                .m_context
+                .llvm_context()
+                .append_basic_block(&evm_mem_func, "mem_ptr_entry");
 
             temp_builder.position_at_end(&entry_bb);
 
-            let data_ptr = temp_builder.build_bitcast(evm_mem_ptr.into_pointer_value(),
-                                                                types_instance.get_byte_ptr_type().ptr_type(AddressSpace::Generic), "");
+            let data_ptr = temp_builder.build_bitcast(
+                evm_mem_ptr.into_pointer_value(),
+                types_instance.get_byte_ptr_type().ptr_type(AddressSpace::Generic),
+                "",
+            );
             let data = temp_builder.build_load(data_ptr.into_pointer_value(), "data");
             let index_value = index_in_mem.into_int_value();
 
@@ -267,37 +292,39 @@ impl<'a> MemoryRepresentationFunctionManager<'a> {
 
             *self.m_evm_mem_ptr_func.borrow_mut() = Some(evm_mem_func);
             evm_mem_func
-        }
-        else {
+        } else {
             let func = self.m_evm_mem_ptr_func.borrow().unwrap();
             func
         }
-
     }
 }
 pub struct MemoryRepresentation<'a> {
     m_context: &'a JITContext,
     m_memory: PointerValue,
-    m_func_mgr: MemoryRepresentationFunctionManager<'a>
+    m_func_mgr: MemoryRepresentationFunctionManager<'a>,
 }
 
 impl<'a> MemoryRepresentation<'a> {
-
-    pub fn new(allocated_memory: PointerValue, context: &'a JITContext,
-                external_func_mgr: &'a ExternalFunctionManager) -> MemoryRepresentation<'a> {
+    pub fn new(
+        allocated_memory: PointerValue,
+        context: &'a JITContext,
+        external_func_mgr: &'a ExternalFunctionManager,
+    ) -> MemoryRepresentation<'a> {
         let mem_type = context.memrep().get_type();
         context.builder().build_store(allocated_memory, mem_type.const_zero());
 
         MemoryRepresentation {
             m_context: context,
             m_memory: allocated_memory,
-            m_func_mgr: MemoryRepresentationFunctionManager::new(context, external_func_mgr)
+            m_func_mgr: MemoryRepresentationFunctionManager::new(context, external_func_mgr),
         }
-
     }
 
-    pub fn new_with_name(name: &str, context: &'a JITContext,
-                         external_func_mgr: &'a ExternalFunctionManager) -> MemoryRepresentation<'a> {
+    pub fn new_with_name(
+        name: &str,
+        context: &'a JITContext,
+        external_func_mgr: &'a ExternalFunctionManager,
+    ) -> MemoryRepresentation<'a> {
         let mem_type = context.memrep().get_type();
         let alloca_result = context.builder().build_alloca(mem_type, name);
         context.builder().build_store(alloca_result, mem_type.const_zero());
@@ -305,7 +332,7 @@ impl<'a> MemoryRepresentation<'a> {
         MemoryRepresentation {
             m_context: context,
             m_memory: alloca_result,
-            m_func_mgr: MemoryRepresentationFunctionManager::new(context, external_func_mgr)
+            m_func_mgr: MemoryRepresentationFunctionManager::new(context, external_func_mgr),
         }
     }
 
@@ -327,27 +354,35 @@ impl<'a> MemoryRepresentation<'a> {
     // llvm::Value* getPtr(llvm::Value* _arrayPtr, llvm::Value* _index) { return m_getPtrFunc.call(m_builder, {_arrayPtr, _index}); }
 
     pub fn get_mem_ptr(&self, mem: PointerValue, index: IntValue) -> PointerValue {
-        let call_site = self.m_context.builder().build_call(self.m_func_mgr.get_evm_mem_ptr_func(),
-                                                  &[mem.into(), index.into()], "");
+        let call_site = self.m_context.builder().build_call(
+            self.m_func_mgr.get_evm_mem_ptr_func(),
+            &[mem.into(), index.into()],
+            "",
+        );
         assert!(call_site.try_as_basic_value().left().is_some());
         let ret = call_site.try_as_basic_value().left().unwrap();
         ret.into_pointer_value()
     }
 
     pub fn extend_memory_size(&self, mem: PointerValue, size: IntValue) {
-        assert_eq!(mem.get_type().get_element_type(), self.m_memory.get_type().get_element_type());
+        assert_eq!(
+            mem.get_type().get_element_type(),
+            self.m_memory.get_type().get_element_type()
+        );
         assert_eq!(size.get_type(), self.m_context.evm_types().get_size_type());
         let extend_func = self.m_func_mgr.get_extend_func();
-        self.m_context.builder().build_call(extend_func, &[mem.into(), size.into()], "");
+        self.m_context
+            .builder()
+            .build_call(extend_func, &[mem.into(), size.into()], "");
     }
 }
 
 #[cfg(test)]
 mod mem_rep_tests {
     use super::*;
+    use evmjit::GetOperandValue;
     use inkwell::attributes::Attribute;
     use inkwell::values::InstructionOpcode;
-    use evmjit::GetOperandValue;
 
     #[test]
     fn test_memory_representation_type() {
@@ -359,15 +394,15 @@ mod mem_rep_tests {
 
         let mem_struct_ptr = mem_type_singleton.get_ptr_type();
         assert!(mem_struct_ptr.get_element_type().is_struct_type());
-        assert!(MemoryRepresentationType::is_mem_representation_type(mem_struct_ptr.get_element_type().as_struct_type()));
+        assert!(MemoryRepresentationType::is_mem_representation_type(
+            mem_struct_ptr.get_element_type().as_struct_type()
+        ));
 
         let evm_word_t = context.custom_width_int_type(256);
         let evm_word_ptr_t = evm_word_t.ptr_type(AddressSpace::Generic);
         let size_t = context.i64_type();
 
-        let fields = [evm_word_ptr_t.into(),
-            size_t.into(),
-            context.i32_type().into()];
+        let fields = [evm_word_ptr_t.into(), size_t.into(), context.i32_type().into()];
 
         let mem_struct2 = context.opaque_struct_type("LinearMemory");
         mem_struct2.set_body(&fields, false);
@@ -441,7 +476,9 @@ mod mem_rep_tests {
         assert!(mem_ptr_arg.is_pointer_value());
         let arg1_elem_t = mem_ptr_arg.into_pointer_value().get_type().get_element_type();
         assert!(arg1_elem_t.is_struct_type());
-        assert!(MemoryRepresentationType::is_mem_representation_type(&arg1_elem_t.into_struct_type()));
+        assert!(MemoryRepresentationType::is_mem_representation_type(
+            &arg1_elem_t.into_struct_type()
+        ));
 
         assert!(mem_get_ptr_func.get_nth_param(1) != None);
         let index_arg = mem_get_ptr_func.get_nth_param(1).unwrap();
@@ -559,7 +596,9 @@ mod mem_rep_tests {
         assert!(mem_ptr_arg.is_pointer_value());
         let arg1_elem_t = mem_ptr_arg.into_pointer_value().get_type().get_element_type();
         assert!(arg1_elem_t.is_struct_type());
-        assert!(MemoryRepresentationType::is_mem_representation_type(&arg1_elem_t.into_struct_type()));
+        assert!(MemoryRepresentationType::is_mem_representation_type(
+            &arg1_elem_t.into_struct_type()
+        ));
 
         assert!(mem_get_extend_func.get_nth_param(1) != None);
         let size_arg = mem_get_extend_func.get_nth_param(1).unwrap();
@@ -569,7 +608,6 @@ mod mem_rep_tests {
         let entry_block_optional = mem_get_extend_func.get_first_basic_block();
         assert!(entry_block_optional != None);
         let entry_block = entry_block_optional.unwrap();
-
 
         // Validate instructions
 
@@ -637,9 +675,14 @@ mod mem_rep_tests {
 
         let fourth_insn_load_operand0 = fourth_insn.get_operand_value(0).unwrap();
         assert!(fourth_insn_load_operand0.is_pointer_value());
-        let fourth_insn_load_operand0_ptr_elt_t = fourth_insn_load_operand0.into_pointer_value().get_type().get_element_type();
+        let fourth_insn_load_operand0_ptr_elt_t = fourth_insn_load_operand0
+            .into_pointer_value()
+            .get_type()
+            .get_element_type();
         assert!(fourth_insn_load_operand0_ptr_elt_t.is_pointer_type());
-        let ptr_to_ptr_type = fourth_insn_load_operand0_ptr_elt_t.into_pointer_type().get_element_type();
+        let ptr_to_ptr_type = fourth_insn_load_operand0_ptr_elt_t
+            .into_pointer_type()
+            .get_element_type();
         assert!(ptr_to_ptr_type.is_int_type());
         assert!(ptr_to_ptr_type.into_int_type().get_bit_width() == 8);
 
@@ -651,7 +694,10 @@ mod mem_rep_tests {
 
         let fifth_insn_load_operand0 = fifth_insn.get_operand_value(0).unwrap();
         assert!(fifth_insn_load_operand0.is_pointer_value());
-        let fifth_insn_load_operand0_ptr_elt_t = fifth_insn_load_operand0.into_pointer_value().get_type().get_element_type();
+        let fifth_insn_load_operand0_ptr_elt_t = fifth_insn_load_operand0
+            .into_pointer_value()
+            .get_type()
+            .get_element_type();
         assert!(fifth_insn_load_operand0_ptr_elt_t.is_int_type());
         assert!(fifth_insn_load_operand0_ptr_elt_t.into_int_type().get_bit_width() == 64);
 
@@ -718,7 +764,7 @@ mod mem_rep_tests {
         let ninth_insn_operand3 = ninth_insn.get_operand_value(3).unwrap();
         assert!(ninth_insn_operand3.is_int_value());
         assert_eq!(ninth_insn_operand3.get_type().into_int_type().get_bit_width(), 1);
-        let ninth_val3= ninth_insn_operand1.into_int_value();
+        let ninth_val3 = ninth_insn_operand1.into_int_value();
         assert!(ninth_val3.is_const());
         assert_eq!(ninth_val3.get_zero_extended_constant().unwrap(), 0u64);
 
@@ -767,4 +813,3 @@ mod mem_rep_tests {
         assert!(thirteenth_insn.get_next_instruction().is_none());
     }
 }
-

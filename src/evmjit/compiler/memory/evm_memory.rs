@@ -1,22 +1,22 @@
 #![allow(dead_code)]
 
-use inkwell::values::FunctionValue;
-use inkwell::module::Linkage::*;
-use std::cell::RefCell;
-use evmjit::compiler::gas_cost::BasicBlockGasManager;
-use evmjit::compiler::runtime::RuntimeManager;
-use evmjit::compiler::external_declarations::ExternalFunctionManager;
-use patch::Patch;
 use super::super::JITContext;
 use super::mem_representation::MemoryRepresentation;
 use evmjit::compiler::byte_order::byte_order_swap;
+use evmjit::compiler::external_declarations::ExternalFunctionManager;
+use evmjit::compiler::gas_cost::BasicBlockGasManager;
+use evmjit::compiler::runtime::RuntimeManager;
+use inkwell::module::Linkage::*;
+use inkwell::values::FunctionValue;
+use patch::Patch;
+use std::cell::RefCell;
 
 struct MemoryFuncDeclarationManager<'a> {
     m_context: &'a JITContext,
     m_evm_mem_load_func: RefCell<Option<FunctionValue>>,
     m_evm_mem_store8_func: RefCell<Option<FunctionValue>>,
     m_evm_mem_store_func: RefCell<Option<FunctionValue>>,
-    m_linear_memory: &'a MemoryRepresentation<'a>
+    m_linear_memory: &'a MemoryRepresentation<'a>,
 }
 
 impl<'a> MemoryFuncDeclarationManager<'a> {
@@ -26,7 +26,7 @@ impl<'a> MemoryFuncDeclarationManager<'a> {
             m_evm_mem_load_func: RefCell::new(None),
             m_evm_mem_store8_func: RefCell::new(None),
             m_evm_mem_store_func: RefCell::new(None),
-            m_linear_memory: linear_memory
+            m_linear_memory: linear_memory,
         }
     }
 
@@ -62,7 +62,9 @@ impl<'a> MemoryFuncDeclarationManager<'a> {
 
             let size_t = types_instance.get_size_type();
             let trunc_index = temp_builder.build_int_truncate(index_in_mem.into_int_value(), size_t, "");
-            let mem_ptr_value = self.m_linear_memory.get_mem_ptr(evm_mem_ptr.into_pointer_value(), trunc_index);
+            let mem_ptr_value = self
+                .m_linear_memory
+                .get_mem_ptr(evm_mem_ptr.into_pointer_value(), trunc_index);
             let val_ptr = temp_builder.build_bitcast(mem_ptr_value, types_instance.get_byte_ptr_type(), "valuePtr");
 
             temp_builder.build_store(val_ptr.into_pointer_value(), value_to_store.into_int_value());
@@ -72,8 +74,7 @@ impl<'a> MemoryFuncDeclarationManager<'a> {
 
             *self.m_evm_mem_store8_func.borrow_mut() = Some(mstore8_func);
             mstore8_func
-        }
-        else {
+        } else {
             let func = self.m_evm_mem_store8_func.borrow().unwrap();
             func
         }
@@ -110,10 +111,12 @@ impl<'a> MemoryFuncDeclarationManager<'a> {
             temp_builder.position_at_end(&entry_bb);
 
             // Value in memory are stored in big-endian order. Convert to big-endian if necessary
-            let value_to_store = byte_order_swap (self.m_context, &temp_builder, value_to_store_arg.into_int_value());
+            let value_to_store = byte_order_swap(self.m_context, &temp_builder, value_to_store_arg.into_int_value());
             let size_t = types_instance.get_size_type();
             let trunc_index = temp_builder.build_int_truncate(index_in_mem.into_int_value(), size_t, "");
-            let mem_ptr_value = self.m_linear_memory.get_mem_ptr(evm_mem_ptr.into_pointer_value(), trunc_index);
+            let mem_ptr_value = self
+                .m_linear_memory
+                .get_mem_ptr(evm_mem_ptr.into_pointer_value(), trunc_index);
             let val_ptr = temp_builder.build_bitcast(mem_ptr_value, types_instance.get_word_ptr_type(), "valuePtr");
 
             temp_builder.build_store(val_ptr.into_pointer_value(), value_to_store);
@@ -123,8 +126,7 @@ impl<'a> MemoryFuncDeclarationManager<'a> {
 
             *self.m_evm_mem_store_func.borrow_mut() = Some(mstore_func);
             mstore_func
-        }
-        else {
+        } else {
             let func = self.m_evm_mem_store_func.borrow().unwrap();
             func
         }
@@ -159,19 +161,20 @@ impl<'a> MemoryFuncDeclarationManager<'a> {
 
             // Truncate 256-bit index into 64-bit index
             let trunc_index = temp_builder.build_int_truncate(index_in_mem.into_int_value(), size_t, "");
-            let mem_ptr_value = self.m_linear_memory.get_mem_ptr(evm_mem_ptr.into_pointer_value(), trunc_index);
+            let mem_ptr_value = self
+                .m_linear_memory
+                .get_mem_ptr(evm_mem_ptr.into_pointer_value(), trunc_index);
             let ret_val = temp_builder.build_load(mem_ptr_value, "");
 
             // Value returned from evm memory is in big-endia order, swap if necessary on little-endian
-            let native_order_val = byte_order_swap (self.m_context, &temp_builder, ret_val.into_int_value());
-            temp_builder.build_return (Some (&native_order_val));
+            let native_order_val = byte_order_swap(self.m_context, &temp_builder, ret_val.into_int_value());
+            temp_builder.build_return(Some(&native_order_val));
 
             // Return instance of function with IR built out
 
             *self.m_evm_mem_load_func.borrow_mut() = Some(mload_func);
             mload_func
-        }
-        else {
+        } else {
             let func = self.m_evm_mem_load_func.borrow().unwrap();
             func
         }
@@ -180,26 +183,25 @@ impl<'a> MemoryFuncDeclarationManager<'a> {
 pub struct EvmMemory<'a, P: Patch + 'a> {
     m_context: &'a JITContext,
     m_gas_mgr: &'a BasicBlockGasManager<'a, P>,
-    m_linear_memory: MemoryRepresentation<'a>
+    m_linear_memory: MemoryRepresentation<'a>,
 }
 
 impl<'a, P: Patch> EvmMemory<'a, P> {
-    pub fn new(context: &'a JITContext,
-               gas_manager: &'a BasicBlockGasManager<'a, P>, rt_manager: &RuntimeManager<'a>,
-               external_func_mgr: &'a ExternalFunctionManager) -> EvmMemory<'a, P> {
-
-        let mem = MemoryRepresentation::new(rt_manager.get_mem_ptr(), context,
-                                                                external_func_mgr);
+    pub fn new(
+        context: &'a JITContext,
+        gas_manager: &'a BasicBlockGasManager<'a, P>,
+        rt_manager: &RuntimeManager<'a>,
+        external_func_mgr: &'a ExternalFunctionManager,
+    ) -> EvmMemory<'a, P> {
+        let mem = MemoryRepresentation::new(rt_manager.get_mem_ptr(), context, external_func_mgr);
 
         EvmMemory {
             m_context: context,
             m_gas_mgr: gas_manager,
-            m_linear_memory: mem
+            m_linear_memory: mem,
         }
-
     }
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -221,8 +223,8 @@ mod tests {
 
         let rt_manager = RuntimeManager::new(&jitctx, &decl_factory);
 
-        let gas_manager : BasicBlockGasManager<EmbeddedPatch> = BasicBlockGasManager::new(&jitctx, &rt_manager);
-        let _memory:EvmMemory<EmbeddedPatch> = EvmMemory::new(&jitctx, &gas_manager, &rt_manager, &decl_factory);
+        let gas_manager: BasicBlockGasManager<EmbeddedPatch> = BasicBlockGasManager::new(&jitctx, &rt_manager);
+        let _memory: EvmMemory<EmbeddedPatch> = EvmMemory::new(&jitctx, &gas_manager, &rt_manager, &decl_factory);
         module.print_to_stderr()
     }
 }

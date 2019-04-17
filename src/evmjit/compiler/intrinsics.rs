@@ -1,8 +1,8 @@
-use inkwell::AddressSpace;
-use inkwell::types::BasicTypeEnum;
-use inkwell::values::FunctionValue;
-use inkwell::types::IntType;
 use inkwell::module::Linkage::*;
+use inkwell::types::BasicTypeEnum;
+use inkwell::types::IntType;
+use inkwell::values::FunctionValue;
+use inkwell::AddressSpace;
 
 use super::JITContext;
 
@@ -24,13 +24,12 @@ pub enum LLVMIntrinsic {
     LongJmp,
     MemSet,
     StackSave,
-    SetJmp
+    SetJmp,
 }
 
 pub trait LLVMIntrinsicManager {
     fn to_name(&self, arg_type: Option<BasicTypeEnum>) -> &'static str;
-    fn get_intrinsic_declaration(&self, context: &JITContext, 
-                                 arg_type: Option<BasicTypeEnum>) -> FunctionValue;
+    fn get_intrinsic_declaration(&self, context: &JITContext, arg_type: Option<BasicTypeEnum>) -> FunctionValue;
 }
 
 impl LLVMIntrinsicManager for LLVMIntrinsic {
@@ -48,7 +47,7 @@ impl LLVMIntrinsicManager for LLVMIntrinsic {
                     64 => BSWAP_I64_INTRINSIC_NAME,
                     _ => panic!("LLVMIntrinsicManager::to_name: bad integer size for bswap"),
                 }
-            },
+            }
 
             LLVMIntrinsic::Ctlz => {
                 assert!(arg_type != None);
@@ -58,7 +57,7 @@ impl LLVMIntrinsicManager for LLVMIntrinsic {
                 assert!(int_bit_width == 256);
 
                 CTLZ_I256_INTRINSIC_NAME
-            },
+            }
 
             LLVMIntrinsic::MemSet => {
                 assert!(arg_type != None);
@@ -71,26 +70,25 @@ impl LLVMIntrinsicManager for LLVMIntrinsic {
                     64 => MEMSET_I64_INTRINSIC_NAME,
                     _ => panic!("LLVMIntrinsicManager::to_name: bad integer size for memset"),
                 }
-
-            },
+            }
 
             // No type
             LLVMIntrinsic::FrameAddress => {
                 assert!(arg_type == None);
                 FRAME_ADDRESS_INTRINSIC_NAME
-            },
+            }
 
             // No type
             LLVMIntrinsic::LongJmp => {
                 assert!(arg_type == None);
                 LONGJMP_INTRINSIC_NAME
-            },
+            }
 
             // No type
             LLVMIntrinsic::StackSave => {
                 assert!(arg_type == None);
                 STACK_SAVE_INTRINSIC_NAME
-            },
+            }
 
             // No type
             LLVMIntrinsic::SetJmp => {
@@ -100,8 +98,7 @@ impl LLVMIntrinsicManager for LLVMIntrinsic {
         }
     }
 
-    fn get_intrinsic_declaration(&self, context: &JITContext,
-                                 arg_type: Option<BasicTypeEnum>) -> FunctionValue {
+    fn get_intrinsic_declaration(&self, context: &JITContext, arg_type: Option<BasicTypeEnum>) -> FunctionValue {
         match self {
             LLVMIntrinsic::Bswap => {
                 assert!(arg_type != None);
@@ -115,16 +112,14 @@ impl LLVMIntrinsicManager for LLVMIntrinsic {
                 let type_enum = BasicTypeEnum::IntType(width_t);
 
                 let bswap_func_type = bswap_ret_type.fn_type(&[type_enum.into()], false);
-                let bswap_func = module.add_function(self.to_name(arg_type), 
-                                                          bswap_func_type, 
-                                                          Some(External));
+                let bswap_func = module.add_function(self.to_name(arg_type), bswap_func_type, Some(External));
 
                 let attr_factory = context.attributes();
                 bswap_func.add_attribute(0, *attr_factory.attr_nounwind());
                 bswap_func.add_attribute(0, *attr_factory.attr_readnone());
                 bswap_func.add_attribute(0, *attr_factory.attr_speculatable());
                 bswap_func
-            },
+            }
 
             LLVMIntrinsic::MemSet => {
                 assert!(arg_type != None);
@@ -145,8 +140,8 @@ impl LLVMIntrinsicManager for LLVMIntrinsic {
                 let arg2 = llvm_ctx.i8_type();
                 let arg4 = llvm_ctx.bool_type();
 
-                let memset_func_type = memset_ret_type.fn_type(&[arg1.into(), arg2.into(),
-                                                                            type_enum.into(), arg4.into()], false);
+                let memset_func_type =
+                    memset_ret_type.fn_type(&[arg1.into(), arg2.into(), type_enum.into(), arg4.into()], false);
                 let memset_func = module.add_function(self.to_name(arg_type), memset_func_type, Some(External));
                 let attr_factory = context.attributes();
 
@@ -154,7 +149,7 @@ impl LLVMIntrinsicManager for LLVMIntrinsic {
                 memset_func.add_attribute(0, *attr_factory.attr_argmemonly());
                 memset_func.add_attribute(1, *attr_factory.attr_nocapture());
                 memset_func
-            },
+            }
 
             LLVMIntrinsic::Ctlz => {
                 let module = context.module();
@@ -164,16 +159,14 @@ impl LLVMIntrinsicManager for LLVMIntrinsic {
                 let arg1 = types_instance.get_word_type();
                 let arg2 = llvm_ctx.bool_type();
                 let ctlz_func_type = ctlz_ret_type.fn_type(&[arg1.into(), arg2.into()], false);
-                let ctlz_func = module.add_function(self.to_name(arg_type), 
-                                                    ctlz_func_type, 
-                                                    Some(External));
+                let ctlz_func = module.add_function(self.to_name(arg_type), ctlz_func_type, Some(External));
 
                 let attr_factory = context.attributes();
                 ctlz_func.add_attribute(0, *attr_factory.attr_nounwind());
                 ctlz_func.add_attribute(0, *attr_factory.attr_readnone());
                 ctlz_func.add_attribute(0, *attr_factory.attr_speculatable());
                 ctlz_func
-            },
+            }
 
             // No type
             LLVMIntrinsic::FrameAddress => {
@@ -182,15 +175,13 @@ impl LLVMIntrinsicManager for LLVMIntrinsic {
                 let frame_addr_ret_type = llvm_ctx.i8_type().ptr_type(AddressSpace::Generic);
                 let arg1 = llvm_ctx.i32_type();
                 let frame_addr_func_type = frame_addr_ret_type.fn_type(&[arg1.into()], false);
-                let frame_addr_func = module.add_function(self.to_name(arg_type), 
-                                                          frame_addr_func_type, 
-                                                          Some(External));
+                let frame_addr_func = module.add_function(self.to_name(arg_type), frame_addr_func_type, Some(External));
 
                 let attr_factory = context.attributes();
                 frame_addr_func.add_attribute(0, *attr_factory.attr_nounwind());
                 frame_addr_func.add_attribute(0, *attr_factory.attr_readnone());
                 frame_addr_func
-            },
+            }
 
             // No type
             LLVMIntrinsic::LongJmp => {
@@ -199,15 +190,13 @@ impl LLVMIntrinsicManager for LLVMIntrinsic {
                 let longjmp_ret_type = llvm_ctx.void_type();
                 let arg1 = llvm_ctx.i8_type().ptr_type(AddressSpace::Generic);
                 let longjmp_func_type = longjmp_ret_type.fn_type(&[arg1.into()], false);
-                let longjmp_func = module.add_function(self.to_name(arg_type), 
-                                                          longjmp_func_type, 
-                                                          Some(External));
+                let longjmp_func = module.add_function(self.to_name(arg_type), longjmp_func_type, Some(External));
 
                 let attr_factory = context.attributes();
                 longjmp_func.add_attribute(0, *attr_factory.attr_nounwind());
                 longjmp_func.add_attribute(0, *attr_factory.attr_noreturn());
                 longjmp_func
-            },
+            }
 
             // No type
             LLVMIntrinsic::StackSave => {
@@ -215,14 +204,12 @@ impl LLVMIntrinsicManager for LLVMIntrinsic {
                 let llvm_ctx = context.llvm_context();
                 let stack_save_ret_type = llvm_ctx.i8_type().ptr_type(AddressSpace::Generic);
                 let stack_save_func_type = stack_save_ret_type.fn_type(&[], false);
-                let stack_save_func = module.add_function(self.to_name(arg_type), 
-                                                          stack_save_func_type, 
-                                                          Some(External));
+                let stack_save_func = module.add_function(self.to_name(arg_type), stack_save_func_type, Some(External));
 
                 let attr_factory = context.attributes();
                 stack_save_func.add_attribute(0, *attr_factory.attr_nounwind());
                 stack_save_func
-            },
+            }
 
             // No type
             LLVMIntrinsic::SetJmp => {
@@ -231,9 +218,7 @@ impl LLVMIntrinsicManager for LLVMIntrinsic {
                 let setjmp_ret_type = llvm_ctx.i32_type();
                 let arg1 = llvm_ctx.i8_type().ptr_type(AddressSpace::Generic);
                 let setjmp_func_type = setjmp_ret_type.fn_type(&[arg1.into()], false);
-                let setjmp_func = module.add_function(self.to_name(arg_type), 
-                                                          setjmp_func_type, 
-                                                          Some(External));
+                let setjmp_func = module.add_function(self.to_name(arg_type), setjmp_func_type, Some(External));
 
                 let attr_factory = context.attributes();
                 setjmp_func.add_attribute(0, *attr_factory.attr_nounwind());
@@ -245,10 +230,10 @@ impl LLVMIntrinsicManager for LLVMIntrinsic {
 
 #[cfg(test)]
 mod tests {
-    use inkwell::context::Context;
-    use inkwell::types::IntType;
     use inkwell::attributes::Attribute;
+    use inkwell::context::Context;
     use inkwell::module::Linkage::*;
+    use inkwell::types::IntType;
 
     use super::*;
 
@@ -271,8 +256,14 @@ mod tests {
         assert_eq!(LLVMIntrinsic::Bswap.to_name(Some(type_enum_i160_t)), "llvm.bswap.i160");
         assert_eq!(LLVMIntrinsic::Ctlz.to_name(Some(type_enum_i256_t)), "llvm.ctlz.i256");
 
-        assert_eq!(LLVMIntrinsic::MemSet.to_name(Some(type_enum_i32_t)), "llvm.memset.p0i8.i32");
-        assert_eq!(LLVMIntrinsic::MemSet.to_name(Some(type_enum_i64_t)), "llvm.memset.p0i8.i64");
+        assert_eq!(
+            LLVMIntrinsic::MemSet.to_name(Some(type_enum_i32_t)),
+            "llvm.memset.p0i8.i32"
+        );
+        assert_eq!(
+            LLVMIntrinsic::MemSet.to_name(Some(type_enum_i64_t)),
+            "llvm.memset.p0i8.i64"
+        );
     }
 
     #[test]
@@ -281,11 +272,13 @@ mod tests {
         let types_instance = jitctx.evm_types();
         let word_type = types_instance.get_word_type();
         let enum_word_type = BasicTypeEnum::IntType(word_type);
-        let func_decl = LLVMIntrinsic::Bswap.get_intrinsic_declaration(&jitctx,
-                                                                       Some(enum_word_type));
+        let func_decl = LLVMIntrinsic::Bswap.get_intrinsic_declaration(&jitctx, Some(enum_word_type));
         assert_eq!(func_decl.count_params(), 1);
         let func_name = func_decl.get_name();
-        assert_eq!(func_name.to_str(), Ok(LLVMIntrinsic::Bswap.to_name(Some(enum_word_type))));
+        assert_eq!(
+            func_name.to_str(),
+            Ok(LLVMIntrinsic::Bswap.to_name(Some(enum_word_type)))
+        );
 
         let arg1 = func_decl.get_first_param().unwrap();
         assert!(arg1.get_type().is_int_type());
@@ -311,11 +304,13 @@ mod tests {
         let types_instance = jitctx.evm_types();
         let addr_type = types_instance.get_address_type();
         let enum_addr_type = BasicTypeEnum::IntType(addr_type);
-        let func_decl = LLVMIntrinsic::Bswap.get_intrinsic_declaration(&jitctx,
-                                                                       Some(enum_addr_type));
+        let func_decl = LLVMIntrinsic::Bswap.get_intrinsic_declaration(&jitctx, Some(enum_addr_type));
         assert_eq!(func_decl.count_params(), 1);
         let func_name = func_decl.get_name();
-        assert_eq!(func_name.to_str(), Ok(LLVMIntrinsic::Bswap.to_name(Some(enum_addr_type))));
+        assert_eq!(
+            func_name.to_str(),
+            Ok(LLVMIntrinsic::Bswap.to_name(Some(enum_addr_type)))
+        );
 
         let arg1 = func_decl.get_first_param().unwrap();
         assert!(arg1.get_type().is_int_type());
@@ -341,11 +336,13 @@ mod tests {
         let types_instance = jitctx.evm_types();
         let addr_type = types_instance.get_size_type();
         let enum_addr_type = BasicTypeEnum::IntType(addr_type);
-        let func_decl = LLVMIntrinsic::Bswap.get_intrinsic_declaration(&jitctx,
-                                                                       Some(enum_addr_type));
+        let func_decl = LLVMIntrinsic::Bswap.get_intrinsic_declaration(&jitctx, Some(enum_addr_type));
         assert_eq!(func_decl.count_params(), 1);
         let func_name = func_decl.get_name();
-        assert_eq!(func_name.to_str(), Ok(LLVMIntrinsic::Bswap.to_name(Some(enum_addr_type))));
+        assert_eq!(
+            func_name.to_str(),
+            Ok(LLVMIntrinsic::Bswap.to_name(Some(enum_addr_type)))
+        );
 
         let arg1 = func_decl.get_first_param().unwrap();
         assert!(arg1.get_type().is_int_type());
@@ -371,11 +368,13 @@ mod tests {
         let types_instance = jitctx.evm_types();
         let word_type = types_instance.get_word_type();
         let enum_word_type = BasicTypeEnum::IntType(word_type);
-        let func_decl = LLVMIntrinsic::Ctlz.get_intrinsic_declaration(&jitctx,
-                                                                       Some(enum_word_type));
+        let func_decl = LLVMIntrinsic::Ctlz.get_intrinsic_declaration(&jitctx, Some(enum_word_type));
         assert_eq!(func_decl.count_params(), 2);
         let func_name = func_decl.get_name();
-        assert_eq!(func_name.to_str(), Ok(LLVMIntrinsic::Ctlz.to_name(Some(enum_word_type))));
+        assert_eq!(
+            func_name.to_str(),
+            Ok(LLVMIntrinsic::Ctlz.to_name(Some(enum_word_type)))
+        );
 
         let arg1 = func_decl.get_nth_param(0).unwrap();
         assert!(arg1.get_type().is_int_type());
@@ -404,8 +403,7 @@ mod tests {
         let jitctx = JITContext::new();
         let context = jitctx.llvm_context();
 
-        let func_decl = LLVMIntrinsic::StackSave.get_intrinsic_declaration(&jitctx,
-                                                                      None);
+        let func_decl = LLVMIntrinsic::StackSave.get_intrinsic_declaration(&jitctx, None);
         assert_eq!(func_decl.count_params(), 0);
         let func_name = func_decl.get_name();
         assert_eq!(func_name.to_str(), Ok(LLVMIntrinsic::StackSave.to_name(None)));
@@ -422,8 +420,7 @@ mod tests {
         let jitctx = JITContext::new();
         let context = jitctx.llvm_context();
 
-        let func_decl = LLVMIntrinsic::FrameAddress.get_intrinsic_declaration(&jitctx,
-                                                                              None);
+        let func_decl = LLVMIntrinsic::FrameAddress.get_intrinsic_declaration(&jitctx, None);
         assert_eq!(func_decl.count_params(), 1);
         let arg1 = func_decl.get_first_param().unwrap();
         assert!(arg1.get_type().is_int_type());
@@ -447,8 +444,7 @@ mod tests {
         let jitctx = JITContext::new();
         let context = jitctx.llvm_context();
 
-        let func_decl = LLVMIntrinsic::SetJmp.get_intrinsic_declaration(&jitctx,
-                                                                              None);
+        let func_decl = LLVMIntrinsic::SetJmp.get_intrinsic_declaration(&jitctx, None);
         assert_eq!(func_decl.count_params(), 1);
         let arg1 = func_decl.get_first_param().unwrap();
         assert!(arg1.get_type().is_pointer_type());
@@ -471,8 +467,7 @@ mod tests {
     fn test_intrinsic_longjmp_decl() {
         let jitctx = JITContext::new();
 
-        let func_decl = LLVMIntrinsic::LongJmp.get_intrinsic_declaration(&jitctx,
-                                                                              None);
+        let func_decl = LLVMIntrinsic::LongJmp.get_intrinsic_declaration(&jitctx, None);
         assert_eq!(func_decl.count_params(), 1);
         let arg1 = func_decl.get_first_param().unwrap();
         assert!(arg1.get_type().is_pointer_type());

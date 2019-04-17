@@ -1,7 +1,7 @@
 #![allow(dead_code)]
 
-use inkwell::module::Linkage::*;
 use inkwell::basic_block::BasicBlock;
+use inkwell::module::Linkage::*;
 use inkwell::values::FunctionValue;
 
 use super::JITContext;
@@ -23,9 +23,9 @@ impl MainFuncCreator {
 
         let main_ret_type = types_instance.get_contract_return_type();
         let arg1 = context.rt().get_ptr_type();
-        
+
         let main_func_type = main_ret_type.fn_type(&[arg1.into()], false);
-        let main_func = module.add_function (name, main_func_type, Some(External));
+        let main_func = module.add_function(name, main_func_type, Some(External));
         main_func.get_first_param().unwrap().into_pointer_value().set_name("rt");
 
         let entry_bb = llvm_ctx.append_basic_block(&main_func, "Entry");
@@ -35,9 +35,9 @@ impl MainFuncCreator {
 
         builder.position_at_end(&jumptable_bb);
         let target = builder.build_phi(types_instance.get_word_type(), "target");
-        builder.build_switch (*target.as_basic_value().as_int_value(), &abort_bb, &[]);
+        builder.build_switch(*target.as_basic_value().as_int_value(), &abort_bb, &[]);
         builder.position_at_end(&entry_bb);
-        
+
         MainFuncCreator {
             m_main_func: main_func,
             m_jumptable_bb: jumptable_bb,

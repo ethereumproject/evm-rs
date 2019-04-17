@@ -1,17 +1,14 @@
-use inkwell::context::Context;
 use inkwell::builder::Builder;
+use inkwell::context::Context;
 use inkwell::module::Module;
 
 use evmjit::compiler::attributes::LLVMAttributeFactory;
 use evmjit::compiler::evmconstants::EvmConstants;
 use evmjit::compiler::evmtypes::EvmTypes;
-use evmjit::compiler::runtime::{
-    txctx::TransactionContextType,
-    rt_type::RuntimeType,
-    rt_data_type::RuntimeDataType,
-    env::EnvDataType,
-};
 use evmjit::compiler::memory::mem_representation::MemoryRepresentationType;
+use evmjit::compiler::runtime::{
+    env::EnvDataType, rt_data_type::RuntimeDataType, rt_type::RuntimeType, txctx::TransactionContextType,
+};
 
 /// The context for the JIT. Includes data that is bound to the LLVM context for a given execution.
 #[derive(Debug)]
@@ -68,7 +65,7 @@ impl JITContext {
             m_rt: rt,
         }
     }
-    
+
     // TODO: explore alternate ways of exposing these interfaces.
     pub fn llvm_context(&self) -> &Context {
         &self.m_llvm_ctx
@@ -79,7 +76,7 @@ impl JITContext {
     }
 
     pub fn module(&self) -> &Module {
-        &self.m_module    
+        &self.m_module
     }
 
     pub fn evm_types(&self) -> &EvmTypes {

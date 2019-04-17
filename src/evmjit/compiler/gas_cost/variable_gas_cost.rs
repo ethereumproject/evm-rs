@@ -1,29 +1,28 @@
+use super::JITContext;
 use bigint::Gas;
-use std::marker::PhantomData;
-use patch::Patch;
-use inkwell::values::IntValue;
-use inkwell::types::BasicTypeEnum;
-use evmjit::compiler::intrinsics::LLVMIntrinsic;
-use evmjit::compiler::intrinsics::LLVMIntrinsicManager;
-use inkwell::IntPredicate;
-use evmjit::ModuleLookup;
-use inkwell::basic_block::BasicBlock;
+use eval::cost::G_COPY;
 use eval::cost::G_LOGDATA;
 use eval::cost::G_SHA3WORD;
-use eval::cost::G_COPY;
-use super::JITContext;
+use evmjit::compiler::intrinsics::LLVMIntrinsic;
+use evmjit::compiler::intrinsics::LLVMIntrinsicManager;
+use evmjit::ModuleLookup;
+use inkwell::basic_block::BasicBlock;
+use inkwell::types::BasicTypeEnum;
+use inkwell::values::IntValue;
+use inkwell::IntPredicate;
+use patch::Patch;
+use std::marker::PhantomData;
 
 pub struct VariableGasCostCalculator<'a, P: Patch> {
     m_context: &'a JITContext,
-    _marker: PhantomData<P>
+    _marker: PhantomData<P>,
 }
 
 impl<'a, P: Patch> VariableGasCostCalculator<'a, P> {
     pub fn new(context: &'a JITContext) -> VariableGasCostCalculator<'a, P> {
-
         VariableGasCostCalculator {
             m_context: context,
-            _marker: PhantomData
+            _marker: PhantomData,
         }
     }
 
@@ -45,14 +44,14 @@ impl<'a, P: Patch> VariableGasCostCalculator<'a, P> {
         let const_zero = context.i64_type().const_zero();
         let const_sha3_word = context.i64_type().const_int(G_SHA3WORD as u64, false);
         // Use logical right shift to divide by 32
-        let wordd = builder.build_right_shift (data_length64, const_five, false, "");
+        let wordd = builder.build_right_shift(data_length64, const_five, false, "");
 
         // Use length & 31 to compute mod 32
 
         let wordrr = builder.build_and(data_length64, const_thirty_one, "");
         let cmp_res = builder.build_int_compare(IntPredicate::NE, wordrr, const_zero, "");
 
-        let add_rem = builder.build_int_z_extend(cmp_res,context.i64_type(), "" );
+        let add_rem = builder.build_int_z_extend(cmp_res, context.i64_type(), "");
         let multiplier_factor = builder.build_int_nuw_add(wordd, add_rem, "");
         let sha3_data_cost = builder.build_int_nuw_mul(multiplier_factor, const_sha3_word, "");
         builder.build_return(Some(&sha3_data_cost));
@@ -66,8 +65,8 @@ impl<'a, P: Patch> VariableGasCostCalculator<'a, P> {
         let gas_type = types_instance.get_gas_type();
 
         let data_length64 = builder.build_int_truncate(log_data_length, gas_type, "data_length");
-        let log_data_const64 = context.i64_type().const_int (G_LOGDATA as u64, false);
-        let log_variable_cost = builder.build_int_nuw_mul(data_length64, log_data_const64 ,"");
+        let log_data_const64 = context.i64_type().const_int(G_LOGDATA as u64, false);
+        let log_variable_cost = builder.build_int_nuw_mul(data_length64, log_data_const64, "");
         builder.build_return(Some(&log_variable_cost));
         log_variable_cost
     }
@@ -92,16 +91,16 @@ impl<'a, P: Patch> VariableGasCostCalculator<'a, P> {
         let const_zero = context.i64_type().const_zero();
         let const_copy_cost = context.i64_type().const_int(G_COPY as u64, false);
         // Use logical right shift to divide by 32
-        let wordd = builder.build_right_shift (data_length64, const_five, false, "");
+        let wordd = builder.build_right_shift(data_length64, const_five, false, "");
 
         // Use length & 31 to compute mod 32
 
         let wordrr = builder.build_and(data_length64, const_thirty_one, "");
-        let cmp_res = builder.build_int_compare (IntPredicate::NE, wordrr, const_zero, "");
+        let cmp_res = builder.build_int_compare(IntPredicate::NE, wordrr, const_zero, "");
 
-        let add_rem = builder.build_int_z_extend(cmp_res,context.i64_type(), "" );
-        let multiplier_factor = builder.build_int_nuw_add (wordd, add_rem, "");
-        let copy_data_cost = builder.build_int_nuw_mul (multiplier_factor, const_copy_cost, "");
+        let add_rem = builder.build_int_z_extend(cmp_res, context.i64_type(), "");
+        let multiplier_factor = builder.build_int_nuw_add(wordd, add_rem, "");
+        let copy_data_cost = builder.build_int_nuw_mul(multiplier_factor, const_copy_cost, "");
         builder.build_return(Some(&copy_data_cost));
         copy_data_cost
     }
@@ -137,9 +136,9 @@ impl<'a, P: Patch> VariableGasCostCalculator<'a, P> {
 
         //let zero_compare_bb_opt = zero_compare.as_instruction_value().unwrap().get_parent();
         //assert!(zero_compare_bb_opt != None);
-       // let zero_compare_bb = zero_compare_bb_opt.unwrap();
+        // let zero_compare_bb = zero_compare_bb_opt.unwrap();
 
-        builder.build_conditional_branch (zero_compare, &exp_exit_bb, &exp_cost_calc_bb);
+        builder.build_conditional_branch(zero_compare, &exp_exit_bb, &exp_cost_calc_bb);
         builder.position_at_end(&exp_cost_calc_bb);
 
         // Formula for exponent calculation is:
@@ -152,9 +151,12 @@ impl<'a, P: Patch> VariableGasCostCalculator<'a, P> {
         // ctlz = count leading zeros
 
         // Get declaration of ctlz
-        let ctlz_decl = LLVMIntrinsic::Ctlz.get_intrinsic_declaration(&self.m_context,
-                                                                      Some(enum_word_type));
-        let lz256 = builder.build_call (ctlz_decl, &[exponent.into(), context.bool_type().const_zero().into()], "lz256");
+        let ctlz_decl = LLVMIntrinsic::Ctlz.get_intrinsic_declaration(&self.m_context, Some(enum_word_type));
+        let lz256 = builder.build_call(
+            ctlz_decl,
+            &[exponent.into(), context.bool_type().const_zero().into()],
+            "lz256",
+        );
         let val = lz256.try_as_basic_value().left().unwrap().into_int_value();
         let lz = builder.build_int_truncate(val, gas_type, "lz");
 
@@ -162,7 +164,7 @@ impl<'a, P: Patch> VariableGasCostCalculator<'a, P> {
         let sig_bits = builder.build_int_sub(temp1, lz, "sigBits");
 
         let one = context.i64_type().const_int(1, false);
-        let log2val = builder.build_int_sub (sig_bits, one, "log2");
+        let log2val = builder.build_int_sub(sig_bits, one, "log2");
 
         // Divide by 8 using logical right shift by 3
 
@@ -171,30 +173,27 @@ impl<'a, P: Patch> VariableGasCostCalculator<'a, P> {
 
         let const_one = context.i64_type().const_int(1, false);
 
-        let add_temp1 = builder.build_int_add (log_div_8, const_one, "");
+        let add_temp1 = builder.build_int_add(log_div_8, const_one, "");
         let expbyte = P::gas_expbyte().as_u64();
 
-        let expbyte_ir = context.i64_type().const_int (expbyte, false);
+        let expbyte_ir = context.i64_type().const_int(expbyte, false);
 
         let exp_variable_cost = builder.build_int_nuw_mul(add_temp1, expbyte_ir, "");
 
-        builder.build_unconditional_branch (&exp_exit_bb);
+        builder.build_unconditional_branch(&exp_exit_bb);
 
         builder.position_at_end(&exp_exit_bb);
         let phi_join = builder.build_phi(context.i64_type(), "exp_phi");
 
         let zero_val64 = context.i64_type().const_zero();
 
-        phi_join.add_incoming(&[(&exp_variable_cost, &exp_cost_calc_bb),
-                                         (&zero_val64, &current_block)]);
+        phi_join.add_incoming(&[(&exp_variable_cost, &exp_cost_calc_bb), (&zero_val64, &current_block)]);
 
         builder.build_return(Some(&phi_join.as_basic_value().into_int_value()));
 
         phi_join.as_basic_value().into_int_value()
     }
 }
-
-
 
 fn native_log_base2(gas_val: Gas) -> usize {
     gas_val.log2floor()
@@ -203,18 +202,17 @@ fn native_log_base2(gas_val: Gas) -> usize {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use evmjit::compiler::evm_compiler::MainFuncCreator;
+    use evmjit::compiler::external_declarations::ExternalFunctionManager;
     use evmjit::compiler::intrinsics::LLVMIntrinsic;
     use evmjit::compiler::intrinsics::LLVMIntrinsicManager;
-    use inkwell::types::BasicTypeEnum;
-    use inkwell::execution_engine::{ExecutionEngine, JitFunction, FunctionLookupError};
-    use inkwell::OptimizationLevel;
-    use evmjit::compiler::evm_compiler::MainFuncCreator;
     use evmjit::compiler::runtime::RuntimeManager;
+    use inkwell::execution_engine::{ExecutionEngine, FunctionLookupError, JitFunction};
+    use inkwell::types::BasicTypeEnum;
+    use inkwell::OptimizationLevel;
     use patch::EmbeddedPatch;
-    use evmjit::compiler::external_declarations::ExternalFunctionManager;
 
     type Log2Func = unsafe extern "C" fn(u64) -> u64;
-
 
     fn jit_compile_log2(
         jitctx: &JITContext,
@@ -232,8 +230,7 @@ mod tests {
         let fn_type = i64_type.fn_type(&[gas_type.into()], false);
 
         // Get declaration of ctlz
-        let ctlz_decl = LLVMIntrinsic::Ctlz.get_intrinsic_declaration(jitctx,
-                                                                      Some(enum_word_type));
+        let ctlz_decl = LLVMIntrinsic::Ctlz.get_intrinsic_declaration(jitctx, Some(enum_word_type));
 
         let function = module.add_function("mylog2", fn_type, None);
         let basic_block = context.append_basic_block(&function, "entry");
@@ -245,8 +242,11 @@ mod tests {
 
         let x256 = builder.build_int_z_extend(x, word_type, "x256");
 
-
-        let lz256 = builder.build_call (ctlz_decl, &[x256.into(), context.bool_type().const_zero().into()], "lz256");
+        let lz256 = builder.build_call(
+            ctlz_decl,
+            &[x256.into(), context.bool_type().const_zero().into()],
+            "lz256",
+        );
         let val = lz256.try_as_basic_value().left().unwrap().into_int_value();
         let lz = builder.build_int_truncate(val, gas_type, "lz");
 
@@ -254,9 +254,7 @@ mod tests {
         let sig_bits = builder.build_int_sub(temp1, lz, "sigBits");
 
         let one = context.i64_type().const_int(1, false);
-        let log2val = builder.build_int_sub (sig_bits, one, "log2");
-
-
+        let log2val = builder.build_int_sub(sig_bits, one, "log2");
 
         builder.build_return(Some(&log2val));
 
@@ -274,7 +272,7 @@ mod tests {
         let decl_factory = ExternalFunctionManager::new(&jitctx);
 
         // Need to create main function before TransactionConextManager otherwise we will crash
-        let main_func = MainFuncCreator::new ("main", &jitctx);
+        let main_func = MainFuncCreator::new("main", &jitctx);
 
         let _manager = RuntimeManager::new(&jitctx, &decl_factory);
         let entry_bb = main_func.get_entry_bb();
@@ -299,7 +297,7 @@ mod tests {
         let decl_factory = ExternalFunctionManager::new(&jitctx);
 
         // Need to create main function before TransactionConextManager otherwise we will crash
-        let main_func = MainFuncCreator::new ("main", &jitctx);
+        let main_func = MainFuncCreator::new("main", &jitctx);
 
         let _manager = RuntimeManager::new(&jitctx, &decl_factory);
         let entry_bb = main_func.get_entry_bb();
@@ -325,7 +323,7 @@ mod tests {
         let decl_factory = ExternalFunctionManager::new(&jitctx);
 
         // Need to create main function before TransactionConextManager otherwise we will crash
-        let main_func = MainFuncCreator::new ("main", &jitctx);
+        let main_func = MainFuncCreator::new("main", &jitctx);
 
         let _manager = RuntimeManager::new(&jitctx, &decl_factory);
         let entry_bb = main_func.get_entry_bb();
@@ -351,7 +349,7 @@ mod tests {
         let decl_factory = ExternalFunctionManager::new(&jitctx);
 
         // Need to create main function before TransactionConextManager otherwise we will crash
-        let main_func = MainFuncCreator::new ("main", &jitctx);
+        let main_func = MainFuncCreator::new("main", &jitctx);
 
         let _manager = RuntimeManager::new(&jitctx, &decl_factory);
         let entry_bb = main_func.get_entry_bb();
@@ -364,7 +362,7 @@ mod tests {
         gas_calculator.copy_data_cost(copy_data_len);
         //module.print_to_stderr();
     }
-    
+
     #[test]
 
     // This test simultes that we can compute log2 using the formula
@@ -384,13 +382,10 @@ mod tests {
 
         module.print_to_stderr();
 
-
         let x = 55u64;
 
         unsafe {
             assert_eq!(mylog.call(x), 5);
         }
-
     }
 }
-

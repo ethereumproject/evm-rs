@@ -35,7 +35,7 @@ impl EvmTypes {
         let void_t = context.void_type();
         let contract_ret_t = context.i32_type();
         let address_t = context.custom_width_int_type(160);
-        
+
         EvmTypes {
             word_type: word_t,
             word_ptr_type: word_ptr_t,
@@ -48,7 +48,7 @@ impl EvmTypes {
             void_type: void_t,
             contract_ret_type: contract_ret_t,
             address_type: address_t,
-            address_ptr_type: address_t.ptr_type(AddressSpace::Generic)
+            address_ptr_type: address_t.ptr_type(AddressSpace::Generic),
         }
     }
 
@@ -109,12 +109,15 @@ fn test_evmtypes() {
 
     let evm_word_ptr = evm_type_singleton.get_word_ptr_type();
     assert_eq!(evm_word_ptr.get_address_space(), AddressSpace::Generic);
-    assert_eq!(evm_word_ptr.get_element_type().into_int_type(), context.custom_width_int_type(256));
+    assert_eq!(
+        evm_word_ptr.get_element_type().into_int_type(),
+        context.custom_width_int_type(256)
+    );
 
     assert_eq!(evm_type_singleton.get_bool_type().get_bit_width(), 1);
     assert_eq!(evm_type_singleton.get_size_type(), context.i64_type());
     assert_eq!(evm_type_singleton.get_size_type().get_bit_width(), 64);
-    
+
     assert_eq!(evm_type_singleton.get_gas_type(), context.i64_type());
     assert_eq!(evm_type_singleton.get_gas_type().get_bit_width(), 64);
 
@@ -139,5 +142,4 @@ fn test_evmtypes() {
     let evm_address_ptr = evm_type_singleton.get_address_ptr_type();
     assert_eq!(evm_address_ptr.get_address_space(), AddressSpace::Generic);
     assert_eq!(evm_address_ptr.get_element_type().into_int_type().get_bit_width(), 160);
-
 }

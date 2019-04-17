@@ -4,28 +4,27 @@ pub mod fixed_gas_cost;
 pub mod variable_gas_cost;
 
 use std::cell::Cell;
-use std::cell::RefCell;
 use std::cell::Ref;
+use std::cell::RefCell;
 
-use patch::Patch;
-use util::opcode::Opcode;
-use inkwell::values::CallSiteValue;
-use inkwell::values::IntValue;
-use inkwell::module::Linkage::*;
-use inkwell::IntPredicate;
-use inkwell::values::FunctionValue;
-use evmjit::compiler::runtime::RuntimeManager;
-use evmjit::compiler::exceptions::ExceptionManager;
 use self::fixed_gas_cost::FixedGasCostCalculator;
 use self::variable_gas_cost::VariableGasCostCalculator;
+use evmjit::compiler::exceptions::ExceptionManager;
 use evmjit::compiler::intrinsics::LLVMIntrinsic;
 use evmjit::compiler::intrinsics::LLVMIntrinsicManager;
+use evmjit::compiler::runtime::RuntimeManager;
+use inkwell::module::Linkage::*;
+use inkwell::values::CallSiteValue;
+use inkwell::values::FunctionValue;
+use inkwell::values::IntValue;
+use inkwell::IntPredicate;
+use patch::Patch;
+use util::opcode::Opcode;
 
 use super::JITContext;
 
 pub trait InstructionGasCost {
-    fn count_fixed_instruction_cost(&mut self, inst_opcode: Opcode, exc_mgr: &ExceptionManager) ;
-
+    fn count_fixed_instruction_cost(&mut self, inst_opcode: Opcode, exc_mgr: &ExceptionManager);
 
     // Variable cost methods
 
@@ -37,11 +36,11 @@ pub trait InstructionGasCost {
 }
 
 pub struct GasCheckFunctionCreator {
-    m_gas_func: FunctionValue
+    m_gas_func: FunctionValue,
 }
 
 impl GasCheckFunctionCreator {
-    pub fn new(name : &str, jitctx: &JITContext) -> GasCheckFunctionCreator {
+    pub fn new(name: &str, jitctx: &JITContext) -> GasCheckFunctionCreator {
         let context = jitctx.llvm_context();
         let module = jitctx.module();
 
@@ -90,7 +89,8 @@ impl GasCheckFunctionCreator {
         gas_func_builder.position_at_end(&check_bb);
 
         let current_gas = gas_func_builder.build_load(gas_ptr.into_pointer_value(), "gas");
-        let updated_gas:IntValue = gas_func_builder.build_int_nsw_sub(current_gas.into_int_value(), gas_cost.into_int_value(), "updatedGas");
+        let updated_gas: IntValue =
+            gas_func_builder.build_int_nsw_sub(current_gas.into_int_value(), gas_cost.into_int_value(), "updatedGas");
         let zero_val64 = context.i64_type().const_zero();
 
         let gas_ok = gas_func_builder.build_int_compare(IntPredicate::SGE, updated_gas, zero_val64, "");
@@ -105,16 +105,13 @@ impl GasCheckFunctionCreator {
         // If we enter this basic block, we ran out ouf gas.
         // Use longjmp to trigger an exception
 
-        let func_decl = LLVMIntrinsic::LongJmp.get_intrinsic_declaration(jitctx,
-                                                                         None);
+        let func_decl = LLVMIntrinsic::LongJmp.get_intrinsic_declaration(jitctx, None);
 
-        gas_func_builder.build_call (func_decl, &[jmp_buf.into_pointer_value().into()], "longJmp");
+        gas_func_builder.build_call(func_decl, &[jmp_buf.into_pointer_value().into()], "longJmp");
 
         gas_func_builder.build_unreachable();
 
-        GasCheckFunctionCreator {
-            m_gas_func: gas_func
-        }
+        GasCheckFunctionCreator { m_gas_func: gas_func }
     }
 
     pub fn get_gas_check_func_decl(&self) -> FunctionValue {
@@ -128,14 +125,11 @@ pub struct BasicBlockGasManager<'a, P: Patch> {
     m_variable_cost: VariableGasCostCalculator<'a, P>,
     m_block_gas_cost: Cell<i64>,
     m_gas_check_call: RefCell<Option<CallSiteValue>>,
-    m_gas_check_creator: GasCheckFunctionCreator
+    m_gas_check_creator: GasCheckFunctionCreator,
 }
 
-
 impl<'a, P: Patch> BasicBlockGasManager<'a, P> {
-    pub fn new(jitctx: &'a JITContext,
-               runtime: &'a RuntimeManager<'a>) -> BasicBlockGasManager<'a, P> {
-
+    pub fn new(jitctx: &'a JITContext, runtime: &'a RuntimeManager<'a>) -> BasicBlockGasManager<'a, P> {
         let variable_cost_calculator: VariableGasCostCalculator<P> = VariableGasCostCalculator::new(&jitctx);
         let func_creator = GasCheckFunctionCreator::new("gas.check", &jitctx);
 
@@ -145,7 +139,7 @@ impl<'a, P: Patch> BasicBlockGasManager<'a, P> {
             m_variable_cost: variable_cost_calculator,
             m_block_gas_cost: Cell::new(0),
             m_gas_check_call: RefCell::new(None),
-            m_gas_check_creator: func_creator
+            m_gas_check_creator: func_creator,
         }
     }
 
@@ -165,13 +159,19 @@ impl<'a, P: Patch> BasicBlockGasManager<'a, P> {
             let cost64 = builder.build_int_truncate(cost, types_instance.get_gas_type(), "");
             let cost_to_use = builder.build_select(too_high, gas_max, cost64, "cost");
 
-
             let arg2 = cost_to_use;
-            builder.build_call(self.m_gas_check_creator.get_gas_check_func_decl(), &[arg1.into(), arg2.into(), arg3.into()], "");
-        }
-        else {
+            builder.build_call(
+                self.m_gas_check_creator.get_gas_check_func_decl(),
+                &[arg1.into(), arg2.into(), arg3.into()],
+                "",
+            );
+        } else {
             assert!(cost.get_type() == types_instance.get_gas_type());
-            self.m_context.builder().build_call(self.m_gas_check_creator.get_gas_check_func_decl(), &[arg1.into(), cost.into(), arg3.into()], "");
+            self.m_context.builder().build_call(
+                self.m_gas_check_creator.get_gas_check_func_decl(),
+                &[arg1.into(), cost.into(), arg3.into()],
+                "",
+            );
         }
     }
 
@@ -202,7 +202,6 @@ impl<'a, P: Patch> BasicBlockGasManager<'a, P> {
     pub fn finalize_block_cost(&self) {
         if self.has_gas_check_call() {
             if self.get_block_gas_cost() == 0 {
-
                 if let Some(ref mock_call_site) = *self.m_gas_check_call.borrow() {
                     let inst = mock_call_site.try_as_basic_value().right().unwrap();
                     assert!(inst.get_parent().is_some());
@@ -210,10 +209,11 @@ impl<'a, P: Patch> BasicBlockGasManager<'a, P> {
                 }
 
                 self.reset_gas_check_call();
-            }
-            else {
+            } else {
                 let types_instance = self.m_context.evm_types();
-                let val = types_instance.get_gas_type().const_int(self.get_block_gas_cost() as u64, false);
+                let val = types_instance
+                    .get_gas_type()
+                    .const_int(self.get_block_gas_cost() as u64, false);
 
                 // Update mocked gas check call with calculated gas of basic block
 
@@ -239,8 +239,11 @@ impl<'a, P: Patch> InstructionGasCost for BasicBlockGasManager<'a, P> {
             let arg2 = types_instance.get_gas_type().get_undef();
             let arg3 = exc_mgr.get_exception_dest();
 
-            let gas_call = builder.build_call(self.m_gas_check_creator.get_gas_check_func_decl(),
-                                                            &[arg1.into(), arg2.into(), arg3.into()], "");
+            let gas_call = builder.build_call(
+                self.m_gas_check_creator.get_gas_check_func_decl(),
+                &[arg1.into(), arg2.into(), arg3.into()],
+                "",
+            );
             self.update_gas_check_call(gas_call);
             assert!(self.has_gas_check_call());
         }
@@ -273,20 +276,19 @@ impl<'a, P: Patch> InstructionGasCost for BasicBlockGasManager<'a, P> {
         let cost = self.m_variable_cost.exp_cost(&current_block, exponent);
         self.count_variable_cost(cost, exc_mgr);
     }
-
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use evmjit::compiler::evm_compiler::MainFuncCreator;
+    use evmjit::compiler::external_declarations::ExternalFunctionManager;
+    use evmjit::GetOperandBasicBlock;
+    use evmjit::{BasicTypeEnumCompare, GetOperandValue};
     use inkwell::attributes::Attribute;
     use inkwell::module::Linkage;
-    use std::ffi::CString;
     use inkwell::values::InstructionOpcode;
-    use evmjit::{GetOperandValue, BasicTypeEnumCompare};
-    use evmjit::GetOperandBasicBlock;
-    use evmjit::compiler::external_declarations::ExternalFunctionManager;
+    use std::ffi::CString;
 
     #[test]
     fn test_gas_check_func_creator() {
@@ -307,7 +309,7 @@ mod tests {
 
         //module.print_to_stderr();
 
-        let gas_check_fn_optional = module.get_function ("gas.check");
+        let gas_check_fn_optional = module.get_function("gas.check");
         assert!(gas_check_fn_optional != None);
         let gas_check_func = gas_check_fn_optional.unwrap();
         assert_eq!(gas_check_func.count_params(), 3);
@@ -361,7 +363,7 @@ mod tests {
 
         // Verify that the second operand of the subtract is the cost
         let cost_arg = gas_check_func.get_nth_param(1).unwrap();
-        assert_eq! (cost_arg, sub_operand1);
+        assert_eq!(cost_arg, sub_operand1);
 
         assert!(second_insn.get_next_instruction() != None);
         let third_insn = second_insn.get_next_instruction().unwrap();
@@ -424,15 +426,21 @@ mod tests {
 
         let first_out_of_gas_insn_operand0 = first_out_of_gas_block_insn.get_operand_value(0).unwrap();
         assert!(first_out_of_gas_insn_operand0.is_pointer_value());
-        let first_out_of_gas_insn_operand0_ptr_elt_t = first_out_of_gas_insn_operand0.into_pointer_value().get_type().get_element_type();
+        let first_out_of_gas_insn_operand0_ptr_elt_t = first_out_of_gas_insn_operand0
+            .into_pointer_value()
+            .get_type()
+            .get_element_type();
         assert!(first_out_of_gas_insn_operand0_ptr_elt_t.is_int_type());
-        assert_eq!(first_out_of_gas_insn_operand0_ptr_elt_t.into_int_type(), context.i8_type());
-
+        assert_eq!(
+            first_out_of_gas_insn_operand0_ptr_elt_t.into_int_type(),
+            context.i8_type()
+        );
 
         assert!(first_out_of_gas_block_insn.get_next_instruction().is_some());
         let second_out_of_gas_block_insn = first_out_of_gas_block_insn.get_next_instruction().unwrap();
-        assert_eq!(second_out_of_gas_block_insn.get_opcode(), InstructionOpcode::Unreachable);
-
+        assert_eq!(
+            second_out_of_gas_block_insn.get_opcode(),
+            InstructionOpcode::Unreachable
+        );
     }
 }
-

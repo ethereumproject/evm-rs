@@ -1,10 +1,10 @@
 #![allow(dead_code)]
-use std::ffi::CString;
-use inkwell::context::Context;
-use inkwell::types::StructType;
-use inkwell::types::PointerType;
-use inkwell::AddressSpace;
 use evmjit::BasicTypeEnumCompare;
+use inkwell::context::Context;
+use inkwell::types::PointerType;
+use inkwell::types::StructType;
+use inkwell::AddressSpace;
+use std::ffi::CString;
 
 pub const NUM_RUNTIME_DATA_FIELDS: usize = 10;
 
@@ -19,8 +19,8 @@ pub enum RuntimeDataTypeFields {
     Address,
     Sender,
     Depth,
-    ReturnData,      // Pointer to return data, used only on RETURN
-    ReturnDataSize   // Return data size, used only on RETURN
+    ReturnData,     // Pointer to return data, used only on RETURN
+    ReturnDataSize, // Return data size, used only on RETURN
 }
 
 pub trait RuntimeDataFieldToIndex {
@@ -44,7 +44,6 @@ impl RuntimeDataFieldToIndex for RuntimeDataTypeFields {
             RuntimeDataTypeFields::ReturnDataSize => 3, // We are deliberately ovelap with CallDataSize
         }
     }
-
 }
 
 pub trait RuntimeDataFieldToName {
@@ -64,11 +63,10 @@ impl RuntimeDataFieldToName for RuntimeDataTypeFields {
             RuntimeDataTypeFields::Address => "msg.address",
             RuntimeDataTypeFields::Sender => "msg.sender",
             RuntimeDataTypeFields::Depth => "msg.depth",
-            RuntimeDataTypeFields::ReturnData => "", 
+            RuntimeDataTypeFields::ReturnData => "",
             RuntimeDataTypeFields::ReturnDataSize => "",
         }
     }
-
 }
 
 #[derive(Debug)]
@@ -76,8 +74,7 @@ impl RuntimeDataFieldToName for RuntimeDataTypeFields {
 // RuntimeDataType is the struct that the JIT will build to pass
 // arguments from the VM to the contract at runtime
 
-pub struct RuntimeDataType
-{
+pub struct RuntimeDataType {
     rt_type: StructType,
     rt_ptr_type: PointerType,
 }
@@ -87,23 +84,25 @@ impl RuntimeDataType {
         let size_t = context.i64_type();
         let byte_ptr_t = context.i8_type().ptr_type(AddressSpace::Generic);
         let evm_word_t = context.custom_width_int_type(256);
-        let fields = [size_t.into(),      // gas
-                      size_t.into(),      // gas price
-                      byte_ptr_t.into(),  // calldata
-                      size_t.into(),      // calldata size
-                      evm_word_t.into(),  // apparent value
-                      byte_ptr_t.into(),  // pointer to evm byte code
-                      size_t.into(),      // size of evm byte code
-                      evm_word_t.into(),  // address
-                      evm_word_t.into(),  // caller address
-                      size_t.into()];     // call depth
-        
+        let fields = [
+            size_t.into(),     // gas
+            size_t.into(),     // gas price
+            byte_ptr_t.into(), // calldata
+            size_t.into(),     // calldata size
+            evm_word_t.into(), // apparent value
+            byte_ptr_t.into(), // pointer to evm byte code
+            size_t.into(),     // size of evm byte code
+            evm_word_t.into(), // address
+            evm_word_t.into(), // caller address
+            size_t.into(),
+        ]; // call depth
+
         let rt_struct = context.opaque_struct_type("RuntimeData");
         rt_struct.set_body(&fields, false);
-        
+
         RuntimeDataType {
             rt_type: rt_struct,
-            rt_ptr_type: rt_struct.ptr_type(AddressSpace::Generic)
+            rt_ptr_type: rt_struct.ptr_type(AddressSpace::Generic),
         }
     }
 
@@ -189,7 +188,6 @@ impl RuntimeDataType {
 
         true
     }
-
 }
 
 #[test]
@@ -205,8 +203,14 @@ fn test_data_field_to_index() {
     assert_eq!(RuntimeDataTypeFields::Address.to_index(), 7);
     assert_eq!(RuntimeDataTypeFields::Sender.to_index(), 8);
     assert_eq!(RuntimeDataTypeFields::Depth.to_index(), 9);
-    assert_eq!(RuntimeDataTypeFields::ReturnData.to_index(), RuntimeDataTypeFields::CallData.to_index());
-    assert_eq!(RuntimeDataTypeFields::ReturnDataSize.to_index(), RuntimeDataTypeFields::CallDataSize.to_index());
+    assert_eq!(
+        RuntimeDataTypeFields::ReturnData.to_index(),
+        RuntimeDataTypeFields::CallData.to_index()
+    );
+    assert_eq!(
+        RuntimeDataTypeFields::ReturnDataSize.to_index(),
+        RuntimeDataTypeFields::CallDataSize.to_index()
+    );
 }
 
 #[test]
@@ -222,7 +226,6 @@ fn test_data_field_to_name() {
     assert_eq!(RuntimeDataTypeFields::Address.to_name(), "msg.address");
     assert_eq!(RuntimeDataTypeFields::Sender.to_name(), "msg.sender");
     assert_eq!(RuntimeDataTypeFields::Depth.to_name(), "msg.depth");
-
 }
 
 #[test]
@@ -232,30 +235,34 @@ fn test_runtime_data_type() {
     let rt_data_type_singleton = RuntimeDataType::new(&context);
     let rt_struct = rt_data_type_singleton.get_type();
 
-    assert!(RuntimeDataType::is_rt_data_type (&rt_struct));
+    assert!(RuntimeDataType::is_rt_data_type(&rt_struct));
 
     // Test for inequality of RuntimeData
     let size_t = context.i64_type();
     let byte_ptr_t = context.i8_type().ptr_type(AddressSpace::Generic);
     let evm_word_t = context.custom_width_int_type(256);
-    let fields = [size_t.into(),      // gas
-                  size_t.into(),      // gas price
-                  byte_ptr_t.into(),  // calldata
-                  size_t.into(),      // calldata size
-                  evm_word_t.into(),  // apparent value
-                  byte_ptr_t.into(),  // pointer to evm byte code
-                  size_t.into(),      // size of evm byte code
-                  evm_word_t.into(),  // address
-                  evm_word_t.into(),  // caller address
-                  evm_word_t.into()];     // call depth
+    let fields = [
+        size_t.into(),     // gas
+        size_t.into(),     // gas price
+        byte_ptr_t.into(), // calldata
+        size_t.into(),     // calldata size
+        evm_word_t.into(), // apparent value
+        byte_ptr_t.into(), // pointer to evm byte code
+        size_t.into(),     // size of evm byte code
+        evm_word_t.into(), // address
+        evm_word_t.into(), // caller address
+        evm_word_t.into(),
+    ]; // call depth
 
     let rt_struct2 = context.opaque_struct_type("RuntimeData");
     rt_struct2.set_body(&fields, false);
-    assert!(!RuntimeDataType::is_rt_data_type (&rt_struct2));
+    assert!(!RuntimeDataType::is_rt_data_type(&rt_struct2));
 
     // Test that we have a pointer to RuntimeData
 
     let rt_struct_ptr = rt_data_type_singleton.get_ptr_type();
     assert!(rt_struct_ptr.get_element_type().is_struct_type());
-    assert!(RuntimeDataType::is_rt_data_type (rt_struct_ptr.get_element_type().as_struct_type()));
+    assert!(RuntimeDataType::is_rt_data_type(
+        rt_struct_ptr.get_element_type().as_struct_type()
+    ));
 }

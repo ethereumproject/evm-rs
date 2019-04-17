@@ -6,7 +6,7 @@ use inkwell::values::IntValue;
 #[derive(Debug)]
 pub struct EvmConstants {
     gas_max: IntValue,
-    i64_zero : IntValue,
+    i64_zero: IntValue,
 }
 
 impl EvmConstants {
@@ -38,5 +38,4 @@ fn test_evmconstants() {
     let i64_zero = evm_constants_singleton.get_i64_zero();
     assert!(i64_zero.is_const());
     assert_eq!(i64_zero.get_zero_extended_constant(), Some(0));
-
 }
