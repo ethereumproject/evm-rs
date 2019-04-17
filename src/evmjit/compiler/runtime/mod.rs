@@ -6,28 +6,22 @@ pub mod stack_init;
 pub mod rt_data_type;
 pub mod rt_type;
 
-use inkwell::context::Context;
-use inkwell::builder::Builder;
-use inkwell::module::Module;
 use inkwell::types::StructType;
 use inkwell::types::PointerType;
 use inkwell::values::BasicValueEnum;
 use inkwell::values::PointerValue;
 use inkwell::values::FunctionValue;
 use inkwell::basic_block::BasicBlock;
-use singletonum::Singleton;
-use self::rt_data_type::RuntimeDataType;
-use self::rt_type::RuntimeType;
 use self::rt_type::RuntimeTypeManager;
 use self::rt_data_type::RuntimeDataTypeFields::Gas;
 use self::rt_data_type::RuntimeDataFieldToIndex;
 use self::txctx::TransactionContextManager;
 use self::stack_init::StackAllocator;
-use evmjit::compiler::evmtypes::EvmTypes;
-use evmjit::compiler::evmconstants::EvmConstants;
 use llvm_sys::LLVMCallConv::*;
 use evmjit::ModuleLookup;
 use evmjit::compiler::external_declarations::ExternalFunctionManager;
+
+use super::JITContext;
 
 #[derive(PartialEq)]
 pub enum TransactionContextTypeFields {
@@ -60,18 +54,19 @@ impl TransactionContextTypeFieldToIndex for TransactionContextTypeFields {
 
 struct GasPtrManager<'a> {
     m_gas_ptr: PointerValue,
-    m_builder: &'a Builder,
+    m_context: &'a JITContext,
 }
 
 impl<'a> GasPtrManager<'a> {
-    pub fn new(context: &Context, builder: &'a Builder, gas_value: BasicValueEnum) -> GasPtrManager<'a> {
-        let types_instance = EvmTypes::get_instance(context);
+    pub fn new(context: &'a JITContext, gas_value: BasicValueEnum) -> GasPtrManager<'a> {
+        let types_instance = context.evm_types();
+        let builder = context.builder();
         let gas_p = builder.build_alloca(types_instance.get_gas_type(), "gas.ptr");
         builder.build_store(gas_p, gas_value);
 
         GasPtrManager {
             m_gas_ptr: gas_p,
-            m_builder: builder
+            m_context: context,
         }
     }
 
@@ -80,7 +75,7 @@ impl<'a> GasPtrManager<'a> {
     }
 
     pub fn get_gas(&self) -> BasicValueEnum {
-        self.m_builder.build_load(*self.get_gas_ptr(), "gas")
+        self.m_context.builder().build_load(*self.get_gas_ptr(), "gas")
     }
 }
 
@@ -88,13 +83,13 @@ impl<'a> GasPtrManager<'a> {
 struct ReturnBufferManager<'a> {
     m_return_buf_data_ptr: PointerValue,
     m_return_buf_size_ptr: PointerValue,
-    m_context: &'a Context,
-    m_builder: &'a Builder,
+    m_context: &'a JITContext,
 }
 
 impl<'a> ReturnBufferManager<'a> {
-    pub fn new(context: &'a Context, builder: &'a Builder) -> ReturnBufferManager<'a> {
-        let types_instance = EvmTypes::get_instance(context);
+    pub fn new(context: &'a JITContext) -> ReturnBufferManager<'a> {
+        let types_instance = context.evm_types();
+        let builder = context.builder();
         let return_buf_data_p = builder.build_alloca(types_instance.get_byte_ptr_type(), "returndata.ptr");
         let return_buf_size_p = builder.build_alloca(types_instance.get_size_type(), "returndatasize.ptr");
 
@@ -102,7 +97,6 @@ impl<'a> ReturnBufferManager<'a> {
             m_return_buf_data_ptr: return_buf_data_p,
             m_return_buf_size_ptr: return_buf_size_p,
             m_context: context,
-            m_builder: builder
         }
     }
 
@@ -115,8 +109,8 @@ impl<'a> ReturnBufferManager<'a> {
     }
 
     pub fn reset_return_buf(&self) {
-        let const_factory = EvmConstants::get_instance(self.m_context);
-        self.m_builder.build_store(self.m_return_buf_size_ptr, const_factory.get_i64_zero());
+        let const_factory = self.m_context.evm_constants();
+        self.m_context.builder().build_store(self.m_return_buf_size_ptr, const_factory.get_i64_zero());
     }
 }
 
@@ -125,13 +119,14 @@ struct MainPrologue {
 }
 
 impl MainPrologue {
-    pub fn new(context: &Context, rt_type_mgr: &RuntimeTypeManager, gas_mgr: &GasPtrManager,
+    pub fn new(jitctx: &JITContext, rt_type_mgr: &RuntimeTypeManager, gas_mgr: &GasPtrManager,
                main_func: FunctionValue, stack_base: BasicValueEnum, decl_factory: &ExternalFunctionManager) -> MainPrologue {
+        let context = jitctx.llvm_context();
         let exit_bb = context.append_basic_block(&main_func, "Exit");
         let temp_builder = context.create_builder();
         temp_builder.position_at_end(&exit_bb);
 
-        let types_instance = EvmTypes::get_instance(context);
+        let types_instance = jitctx.evm_types();
         let phi = temp_builder.build_phi(types_instance.get_contract_return_type(), "ret");
 
         let free_func = decl_factory.get_free_decl();
@@ -156,9 +151,7 @@ impl MainPrologue {
 }
 
 pub struct RuntimeManager<'a> {
-    m_context: &'a Context,
-    m_builder: &'a Builder,
-    m_module: &'a Module,
+    m_context: &'a JITContext,
     m_txctx_manager:  TransactionContextManager<'a>,
     m_rt_type_manager: RuntimeTypeManager<'a>,
     m_stack_allocator: StackAllocator,
@@ -168,32 +161,31 @@ pub struct RuntimeManager<'a> {
 }
 
 impl<'a> RuntimeManager<'a> {
-    pub fn new(context: &'a Context, builder: &'a Builder, module: &'a Module, decl_factory: &ExternalFunctionManager) -> RuntimeManager<'a> {
-
+    pub fn new(jitctx: &'a JITContext, decl_factory: &ExternalFunctionManager) -> RuntimeManager<'a> {
+        let builder = jitctx.builder();
+        let module = jitctx.module();
         let main_func_opt = module.get_main_function(builder);
         assert!(main_func_opt != None);
 
         // Generate IR for transaction context related items
-        let txctx_manager = TransactionContextManager::new (&context, &builder, &module);
+        let txctx_manager = TransactionContextManager::new(jitctx);
 
         // Generate IR for runtime type related items
-        let rt_type_manager = RuntimeTypeManager::new (&context, &builder, &module);
+        let rt_type_manager = RuntimeTypeManager::new(jitctx);
 
-        let stack_allocator = StackAllocator::new (&context, &builder, &decl_factory);
+        let stack_allocator = StackAllocator::new(jitctx, decl_factory);
 
-        let gas_ptr_mgr = GasPtrManager::new(context, builder, rt_type_manager.get_gas());
+        let gas_ptr_mgr = GasPtrManager::new(jitctx, rt_type_manager.get_gas());
 
-        let return_buf_mgr = ReturnBufferManager::new(context, builder);
+        let return_buf_mgr = ReturnBufferManager::new(jitctx);
         return_buf_mgr.reset_return_buf();
 
-        let prologue_manager = MainPrologue::new(context, &rt_type_manager, &gas_ptr_mgr,
+        let prologue_manager = MainPrologue::new(jitctx, &rt_type_manager, &gas_ptr_mgr,
                                                  main_func_opt.unwrap(), stack_allocator.get_stack_base_as_ir_value(),
                                                     decl_factory);
 
         RuntimeManager {
-            m_context: context,
-            m_builder: builder,
-            m_module: module,
+            m_context: jitctx,
             m_txctx_manager: txctx_manager,
             m_rt_type_manager: rt_type_manager,
             m_stack_allocator: stack_allocator,
@@ -204,7 +196,8 @@ impl<'a> RuntimeManager<'a> {
     }
 
     pub fn gen_tx_ctx_item_ir(&self, field : TransactionContextTypeFields) -> BasicValueEnum {
-        let call = self.m_builder.build_call (self.m_txctx_manager.get_tx_ctx_fn_ssa_var(),
+        let builder = self.m_context.builder();
+        let call = builder.build_call (self.m_txctx_manager.get_tx_ctx_fn_ssa_var(),
                                               &[self.m_txctx_manager.get_tx_ctx_loaded_ssa_var().into(),
                                                 self.m_txctx_manager.get_tx_ctx_ssa_var().into(),
                                                 self.m_rt_type_manager.get_env_ptr().into()], "");
@@ -212,31 +205,31 @@ impl<'a> RuntimeManager<'a> {
         let index = field.to_index();
 
         unsafe {
-            let mut ptr = self.m_builder.build_struct_gep(self.m_txctx_manager.get_tx_ctx_ssa_var(),
+            let mut ptr = builder.build_struct_gep(self.m_txctx_manager.get_tx_ctx_ssa_var(),
                                                           index as u32, "");
 
             // Origin and Coinbase are declared as arrays of 20 bytes (160 bits) to deal with alignment issues
             // Cast back to i160 pointer here
 
             if field ==  TransactionContextTypeFields::Origin || field == TransactionContextTypeFields::CoinBase {
-                let types_instance = EvmTypes::get_instance(self.m_context);
-                ptr = self.m_builder.build_pointer_cast (ptr, types_instance.get_address_ptr_type(), "");
+                let types_instance = self.m_context.evm_types();
+                ptr = builder.build_pointer_cast (ptr, types_instance.get_address_ptr_type(), "");
             }
 
-            self.m_builder.build_load(ptr, "")
+            builder.build_load(ptr, "")
         }
     }
 
     pub fn get_runtime_data_type(&self) -> StructType {
-        RuntimeDataType::get_instance(self.m_context).get_type()
+        self.m_context.rt_data().get_type()
     }
 
     pub fn get_runtime_type(&self) -> StructType {
-        RuntimeType::get_instance(self.m_context).get_type()
+        self.m_context.rt().get_type()
     }
 
     pub fn get_runtime_ptr_type(&self) -> PointerType {
-        RuntimeType::get_instance(self.m_context).get_ptr_type()
+        self.m_context.rt().get_ptr_type()
     }
 
     pub fn get_runtime_ptr(&self) -> BasicValueEnum {
@@ -248,7 +241,7 @@ impl<'a> RuntimeManager<'a> {
     }
 
     pub fn get_gas_ptr(&self) -> &PointerValue {
-        assert!(self.m_module.get_main_function(self.m_builder) != None);
+        assert!(self.m_context.module().get_main_function(self.m_context.builder()) != None);
         self.m_gas_ptr_manager.get_gas_ptr()
     }
 
@@ -277,13 +270,17 @@ impl<'a> RuntimeManager<'a> {
 #[cfg(test)]
 mod runtime_tests {
     use std::ffi::CString;
-    use super::*;
+
     use inkwell::values::InstructionOpcode;
-    use self::txctx::TransactionContextType;
-    use self::env::EnvDataType;
-    use evmjit::compiler::evm_compiler::MainFuncCreator;
-    use evmjit::GetOperandValue;
     use inkwell::module::Linkage::External;
+
+    use evmjit::GetOperandValue;
+    use evmjit::compiler::evm_compiler::MainFuncCreator;
+    use super::*;
+    use super::super::runtime::rt_type::RuntimeType;
+    use super::super::runtime::rt_data_type::RuntimeDataType;
+    use self::env::EnvDataType;
+    use self::txctx::TransactionContextType;
 
     #[test]
     fn test_data_field_to_index() {
@@ -298,16 +295,14 @@ mod runtime_tests {
 
     #[test]
     fn test_runtime_manager() {
-        let context = Context::create();
-        let module = context.create_module("my_module");
-        let builder = context.create_builder();
-        let decl_factory = ExternalFunctionManager::new(&context, &module);
+        let jitctx = JITContext::new();
+        let decl_factory = ExternalFunctionManager::new(&jitctx);
 
         // Generate outline of main function needed by 'RuntimeTypeManager
-        MainFuncCreator::new ("main", &context, &builder, &module);
+        MainFuncCreator::new ("main", &jitctx);
 
         //let manager = RuntimeManager::new("main", &context, &builder, &module);
-        let manager = RuntimeManager::new(&context, &builder, &module, &decl_factory);
+        let manager = RuntimeManager::new(&jitctx, &decl_factory);
 
         assert!(RuntimeDataType::is_rt_data_type(&manager.get_runtime_data_type()));
         assert!(RuntimeType::is_runtime_type(&manager.get_runtime_type()));
@@ -319,16 +314,17 @@ mod runtime_tests {
 
     #[test]
     fn test_gas_ptr_manager() {
-        let context = Context::create();
-        let module = context.create_module("my_module");
-        let builder = context.create_builder();
-        let decl_factory = ExternalFunctionManager::new(&context, &module);
+        let jitctx = JITContext::new();
+        let context = jitctx.llvm_context();
+        let module = jitctx.module();
+        let builder = jitctx.builder();
+        let decl_factory = ExternalFunctionManager::new(&jitctx);
 
         // Generate outline of main function needed by 'RuntimeTypeManager
-        MainFuncCreator::new ("main", &context, &builder, &module);
+        MainFuncCreator::new ("main", &jitctx);
 
         // Generate IR for runtime type related items
-        let rt_type_manager = RuntimeManager::new (&context, &builder, &module, &decl_factory);
+        let rt_type_manager = RuntimeManager::new (&jitctx, &decl_factory);
 
         // Create dummy function
 
@@ -340,7 +336,7 @@ mod runtime_tests {
 
         builder.position_at_end(&gas_bb);
 
-        GasPtrManager::new(&context, &builder, rt_type_manager.get_gas());
+        GasPtrManager::new(&jitctx, rt_type_manager.get_gas());
 
         module.print_to_stderr();
 
@@ -374,9 +370,10 @@ mod runtime_tests {
 
     #[test]
     fn test_return_buffer_manager() {
-        let context = Context::create();
-        let module = context.create_module("my_module");
-        let builder = context.create_builder();
+        let jitctx = JITContext::new();
+        let context = jitctx.llvm_context();
+        let module = jitctx.module();
+        let builder = jitctx.builder();
 
         // Create dummy function
 
@@ -385,7 +382,7 @@ mod runtime_tests {
         let entry_bb = context.append_basic_block(&my_fn, "entry");
         builder.position_at_end(&entry_bb);
 
-        let return_buf_mgr = ReturnBufferManager::new(&context, &builder);
+        let return_buf_mgr = ReturnBufferManager::new(&jitctx);
         return_buf_mgr.reset_return_buf();
 
         let entry_block_optional = my_fn.get_first_basic_block();
@@ -418,15 +415,16 @@ mod runtime_tests {
 
     #[test]
     fn test_get_tx_ctx_item_gasprice() {
-        let context = Context::create();
-        let module = context.create_module("my_module");
-        let builder = context.create_builder();
-        let decl_factory = ExternalFunctionManager::new(&context, &module);
+        let jitctx = JITContext::new();
+        let context = jitctx.llvm_context();
+        let module = jitctx.module();
+        let builder = jitctx.builder();
+        let decl_factory = ExternalFunctionManager::new(&jitctx);
 
         // Need to create main function before TransactionConextManager otherwise we will crash
-        MainFuncCreator::new ("main", &context, &builder, &module);
+        MainFuncCreator::new ("main", &jitctx);
 
-        let manager = RuntimeManager::new(&context, &builder, &module, &decl_factory);
+        let manager = RuntimeManager::new(&jitctx, &decl_factory);
 
         let main_fn_optional = module.get_function ("main");
         assert!(main_fn_optional != None);
@@ -504,14 +502,15 @@ mod runtime_tests {
 
     #[test]
     fn test_get_tx_ctx_item_origin() {
-        let context = Context::create();
-        let module = context.create_module("my_module");
-        let builder = context.create_builder();
-        let decl_factory = ExternalFunctionManager::new(&context, &module);
+        let jitctx = JITContext::new();
+        let context = jitctx.llvm_context();
+        let module = jitctx.module();
+        let builder = jitctx.builder();
+        let decl_factory = ExternalFunctionManager::new(&jitctx);
 
         // Need to create main function before TransactionConextManager otherwise we will crash
-        MainFuncCreator::new ("main", &context, &builder, &module);
-        let manager = RuntimeManager::new(&context, &builder, &module, &decl_factory);
+        MainFuncCreator::new ("main", &jitctx);
+        let manager = RuntimeManager::new(&jitctx, &decl_factory);
 
         let main_fn_optional = module.get_function ("main");
         assert!(main_fn_optional != None);
@@ -593,15 +592,16 @@ mod runtime_tests {
 
     #[test]
     fn test_get_tx_ctx_item_coinbase() {
-        let context = Context::create();
-        let module = context.create_module("my_module");
-        let builder = context.create_builder();
-        let decl_factory = ExternalFunctionManager::new(&context, &module);
+        let jitctx = JITContext::new();
+        let context = jitctx.llvm_context();
+        let module = jitctx.module();
+        let builder = jitctx.builder();
+        let decl_factory = ExternalFunctionManager::new(&jitctx);
 
         // Need to create main function before TransactionConextManager otherwise we will crash
-        MainFuncCreator::new ("main", &context, &builder, &module);
+        MainFuncCreator::new ("main", &jitctx);
 
-        let manager = RuntimeManager::new(&context, &builder, &module, &decl_factory);
+        let manager = RuntimeManager::new(&jitctx, &decl_factory);
 
         let main_fn_optional = module.get_function ("main");
         assert!(main_fn_optional != None);
@@ -683,15 +683,16 @@ mod runtime_tests {
 
     #[test]
     fn test_get_tx_ctx_item_number() {
-        let context = Context::create();
-        let module = context.create_module("my_module");
-        let builder = context.create_builder();
-        let decl_factory = ExternalFunctionManager::new(&context, &module);
+        let jitctx = JITContext::new();
+        let context = jitctx.llvm_context();
+        let module = jitctx.module();
+        let builder = jitctx.builder();
+        let decl_factory = ExternalFunctionManager::new(&jitctx);
 
         // Need to create main function before TransactionConextManager otherwise we will crash
-        MainFuncCreator::new ("main", &context, &builder, &module);
+        MainFuncCreator::new ("main", &jitctx);
 
-        let manager = RuntimeManager::new(&context, &builder, &module, &decl_factory);
+        let manager = RuntimeManager::new(&jitctx, &decl_factory);
 
         let main_fn_optional = module.get_function ("main");
         assert!(main_fn_optional != None);
@@ -769,15 +770,16 @@ mod runtime_tests {
 
     #[test]
     fn test_get_tx_ctx_item_timestamp() {
-        let context = Context::create();
-        let module = context.create_module("my_module");
-        let builder = context.create_builder();
-        let decl_factory = ExternalFunctionManager::new(&context, &module);
+        let jitctx = JITContext::new();
+        let context = jitctx.llvm_context();
+        let module = jitctx.module();
+        let builder = jitctx.builder();
+        let decl_factory = ExternalFunctionManager::new(&jitctx);
 
         // Need to create main function before TransactionConextManager otherwise we will crash
-        MainFuncCreator::new ("main", &context, &builder, &module);
+        MainFuncCreator::new ("main", &jitctx);
 
-        let manager = RuntimeManager::new(&context, &builder, &module, &decl_factory);
+        let manager = RuntimeManager::new(&jitctx, &decl_factory);
 
         let main_fn_optional = module.get_function ("main");
         assert!(main_fn_optional != None);
@@ -855,15 +857,16 @@ mod runtime_tests {
 
     #[test]
     fn test_get_tx_ctx_item_gaslimit() {
-        let context = Context::create();
-        let module = context.create_module("my_module");
-        let builder = context.create_builder();
-        let decl_factory = ExternalFunctionManager::new(&context, &module);
+        let jitctx = JITContext::new();
+        let context = jitctx.llvm_context();
+        let module = jitctx.module();
+        let builder = jitctx.builder();
+        let decl_factory = ExternalFunctionManager::new(&jitctx);
 
         // Need to create main function before TransactionConextManager otherwise we will crash
-        MainFuncCreator::new ("main", &context, &builder, &module);
+        MainFuncCreator::new ("main", &jitctx);
 
-        let manager = RuntimeManager::new(&context, &builder, &module, &decl_factory);
+        let manager = RuntimeManager::new(&jitctx, &decl_factory);
 
         let main_fn_optional = module.get_function ("main");
         assert!(main_fn_optional != None);
@@ -941,15 +944,16 @@ mod runtime_tests {
 
     #[test]
     fn test_get_tx_ctx_item_difficulty() {
-        let context = Context::create();
-        let module = context.create_module("my_module");
-        let builder = context.create_builder();
-        let decl_factory = ExternalFunctionManager::new(&context, &module);
+        let jitctx = JITContext::new();
+        let context = jitctx.llvm_context();
+        let module = jitctx.module();
+        let builder = jitctx.builder();
+        let decl_factory = ExternalFunctionManager::new(&jitctx);
 
         // Need to create main function before TransactionConextManager otherwise we will crash
-        MainFuncCreator::new ("main", &context, &builder, &module);
+        MainFuncCreator::new ("main", &jitctx);
 
-        let manager = RuntimeManager::new(&context, &builder, &module, &decl_factory);
+        let manager = RuntimeManager::new(&jitctx, &decl_factory);
 
         let main_fn_optional = module.get_function ("main");
         assert!(main_fn_optional != None);

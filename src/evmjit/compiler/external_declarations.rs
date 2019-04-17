@@ -1,30 +1,23 @@
 #![allow(dead_code)]
 
-use evmjit::compiler::evmtypes::EvmTypes;
-use inkwell::context::Context;
-use inkwell::module::Module;
-use inkwell::values::FunctionValue;
-use evmjit::LLVMAttributeFactory;
 use std::cell::RefCell;
+
+use inkwell::values::FunctionValue;
 use inkwell::module::Linkage::*;
-use singletonum::Singleton;
+
+use super::JITContext;
 
 pub struct ExternalFunctionManager<'a> {
-    m_context: &'a Context,
-    m_module: &'a Module,
+    m_context: &'a JITContext,
     malloc_decl: RefCell<Option<FunctionValue>>,
     free_decl: RefCell<Option<FunctionValue>>,
     realloc_decl: RefCell<Option<FunctionValue>>,
 }
 
-
-
-
 impl<'a> ExternalFunctionManager<'a> {
-    pub fn new(context: &'a Context, module: &'a Module) -> ExternalFunctionManager<'a> {
+    pub fn new(context: &'a JITContext) -> ExternalFunctionManager<'a> {
         ExternalFunctionManager {
             m_context: context,
-            m_module: module,
             malloc_decl: RefCell::new(None),
             free_decl: RefCell::new(None),
             realloc_decl: RefCell::new(None),
@@ -33,11 +26,12 @@ impl<'a> ExternalFunctionManager<'a> {
 
     pub fn get_malloc_decl(&self) -> FunctionValue {
         if self.malloc_decl.borrow().is_none() {
-            let types_instance = EvmTypes::get_instance(self.m_context);
+            let module = self.m_context.module();
+            let types_instance = self.m_context.evm_types();
             let malloc_fn_type = types_instance.get_word_ptr_type().fn_type(&[types_instance.get_size_type().into()], false);
 
-            let malloc_func = self.m_module.add_function ("malloc", malloc_fn_type, Some(External));
-            let attr_factory = LLVMAttributeFactory::get_instance(&self.m_context);
+            let malloc_func = module.add_function ("malloc", malloc_fn_type, Some(External));
+            let attr_factory = self.m_context.attributes();
 
             malloc_func.add_attribute(0, *attr_factory.attr_nounwind());
             malloc_func.add_attribute(0, *attr_factory.attr_noalias());
@@ -54,13 +48,13 @@ impl<'a> ExternalFunctionManager<'a> {
 
     pub fn get_free_decl(&self) -> FunctionValue {
         if self.free_decl.borrow().is_none() {
-            let types_instance = EvmTypes::get_instance(self.m_context);
-            let free_ret_type = self.m_context.void_type();
+            let types_instance = self.m_context.evm_types();
+            let free_ret_type = self.m_context.llvm_context().void_type();
             let arg1 = types_instance.get_word_ptr_type();
             let free_func_type = free_ret_type.fn_type(&[arg1.into()], false);
-            let free_func = self.m_module.add_function("free", free_func_type, Some(External));
+            let free_func = self.m_context.module().add_function("free", free_func_type, Some(External));
 
-            let attr_factory = LLVMAttributeFactory::get_instance(&self.m_context);
+            let attr_factory = self.m_context.attributes();
             free_func.add_attribute(0, *attr_factory.attr_nounwind());
             free_func.add_attribute(1, *attr_factory.attr_nocapture());
 
@@ -75,15 +69,15 @@ impl<'a> ExternalFunctionManager<'a> {
 
     pub fn get_realloc_decl(&self) -> FunctionValue {
         if self.realloc_decl.borrow().is_none() {
-            let types_instance = EvmTypes::get_instance(self.m_context);
+            let types_instance = self.m_context.evm_types();
             let realloc_return_type = types_instance.get_byte_ptr_type();
             let arg1 = types_instance.get_byte_ptr_type();
             let arg2 = types_instance.get_size_type();
             let realloc_func_type = realloc_return_type.fn_type(&[arg1.into(), arg2.into()], false);
 
-            let realloc_func = self.m_module.add_function("realloc", realloc_func_type, Some(External));
+            let realloc_func = self.m_context.module().add_function("realloc", realloc_func_type, Some(External));
 
-            let attr_factory = LLVMAttributeFactory::get_instance(&self.m_context);
+            let attr_factory = self.m_context.attributes();
             realloc_func.add_attribute(0, *attr_factory.attr_noalias());
             realloc_func.add_attribute(0, *attr_factory.attr_nounwind());
             realloc_func.add_attribute(1, *attr_factory.attr_nocapture());
@@ -101,19 +95,21 @@ impl<'a> ExternalFunctionManager<'a> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use inkwell::attributes::Attribute;
     use std::ffi::CString;
+
+    use inkwell::attributes::Attribute;
+
+    use super::*;
 
     #[test]
     fn test_get_malloc_decl() {
-        let context = Context::create();
-        let module = context.create_module("my_module");
+        let jitctx = JITContext::new();
+        let module = jitctx.module();
         
-        let evmtypes = EvmTypes::get_instance(&context);
-        let attr_factory = LLVMAttributeFactory::get_instance(&context);
+        let evmtypes = jitctx.evm_types();
+        let attr_factory = jitctx.attributes();
 
-        let decl_manager = ExternalFunctionManager::new(&context, &module);
+        let decl_manager = ExternalFunctionManager::new(&jitctx);
         let malloc_func_optional = module.get_function("malloc");
         assert!(malloc_func_optional.is_none());
 
@@ -147,13 +143,13 @@ mod tests {
 
     #[test]
     fn test_get_free_decl() {
-        let context = Context::create();
-        let module = context.create_module("my_module");
+        let jitctx = JITContext::new();
+        let module = jitctx.module();
         
-        let evmtypes = EvmTypes::get_instance(&context);
-        let attr_factory = LLVMAttributeFactory::get_instance(&context);
+        let evmtypes = jitctx.evm_types();
+        let attr_factory = jitctx.attributes();
 
-        let decl_manager = ExternalFunctionManager::new(&context, &module);
+        let decl_manager = ExternalFunctionManager::new(&jitctx);
         let free_func_optional = module.get_function("free");
         assert!(free_func_optional.is_none());
 
@@ -188,13 +184,13 @@ mod tests {
 
     #[test]
     fn test_get_realloc_decl() {
-        let context = Context::create();
-        let module = context.create_module("my_module");
+        let jitctx = JITContext::new();
+        let module = jitctx.module();
 
-        let evmtypes = EvmTypes::get_instance(&context);
-        let attr_factory = LLVMAttributeFactory::get_instance(&context);
+        let evmtypes = jitctx.evm_types();
+        let attr_factory = jitctx.attributes();
 
-        let decl_manager = ExternalFunctionManager::new(&context, &module);
+        let decl_manager = ExternalFunctionManager::new(&jitctx);
         let realloc_func_optional = module.get_function("realloc");
         assert!(realloc_func_optional.is_none());
 

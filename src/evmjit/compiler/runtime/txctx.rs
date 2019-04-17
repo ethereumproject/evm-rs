@@ -1,22 +1,20 @@
 #![allow(dead_code)]
 
-use singletonum::{Singleton, SingletonInit};
+use std::ffi::CString;
+
 use inkwell::context::Context;
-use inkwell::builder::Builder;
-use inkwell::module::Module;
 use inkwell::types::StructType;
 use inkwell::types::PointerType;
 use inkwell::values::PointerValue;
 use inkwell::values::FunctionValue;
 use inkwell::module::Linkage::*;
 use inkwell::AddressSpace;
-use evmjit::compiler::runtime::env::EnvDataType;
 use llvm_sys::LLVMCallConv::*;
-use std::ffi::CString;
+
+use super::super::JITContext;
 
 
-#[derive(Debug, Singleton)]
-
+#[derive(Debug)]
 pub struct TransactionContextType {
     txctx_type: StructType,
     txctx_ptr_type: PointerType,
@@ -25,9 +23,8 @@ pub struct TransactionContextType {
 unsafe impl Sync for TransactionContextType {}
 unsafe impl Send for TransactionContextType {}
 
-impl SingletonInit for TransactionContextType {
-    type Init = Context;
-    fn init(context: &Context) -> Self {
+impl TransactionContextType {
+    pub fn new(context: &Context) -> Self {
         let i64_t = context.i64_type();
         let i256_t = context.custom_width_int_type(256);
         let i8_t = context.i8_type();
@@ -49,9 +46,7 @@ impl SingletonInit for TransactionContextType {
             txctx_ptr_type : tx_struct.ptr_type(AddressSpace::Generic)
         }
     }
-}
 
-impl TransactionContextType {
     pub fn get_type(&self) -> StructType {
         self.txctx_type
     }
@@ -176,19 +171,21 @@ pub struct TransactionContextManager<'a> {
     m_tx_ctx_loaded : PointerValue,
     m_tx_ctx : PointerValue,
     m_load_tx_ctx_fn : FunctionValue,
-    m_builder: &'a Builder,
-    m_context: &'a Context,
+    m_context: &'a JITContext,
 }
 
 
 impl<'a> TransactionContextManager<'a> {
-    pub fn new(context: &'a Context, builder: &'a Builder, module: &Module) -> TransactionContextManager<'a> {
+    pub fn new(jitctx: &'a JITContext) -> TransactionContextManager<'a> {
+        let context = jitctx.llvm_context();
+        let builder = jitctx.builder();
+        let module = jitctx.module();
         let bool_t = context.bool_type();
         let tx_loaded = builder.build_alloca(bool_t, "txctx.loaded");
         builder.build_store(tx_loaded, bool_t.const_int(0, false));
 
-        let env_data_singleton = EnvDataType::get_instance(&context);
-        let tx_ctx_singleton = TransactionContextType::get_instance(&context);
+        let env_data_singleton = jitctx.env();
+        let tx_ctx_singleton = jitctx.txctx();
         
         let tx_ctx_alloca = builder.build_alloca(tx_ctx_singleton.get_type(), "txctx");
 
@@ -235,13 +232,12 @@ impl<'a> TransactionContextManager<'a> {
             m_tx_ctx_loaded : tx_loaded,
             m_tx_ctx : tx_ctx_alloca,
             m_load_tx_ctx_fn : load_tx_ctx_fn,
-            m_builder : builder,
-            m_context : context
+            m_context : jitctx, 
         }
     }
 
     pub fn get_tx_ctx_type(&self) -> & TransactionContextType {
-        TransactionContextType::get_instance(self.m_context)
+        self.m_context.txctx()
     }
 
     pub fn get_tx_ctx_loaded_ssa_var(&self) -> PointerValue {
@@ -261,16 +257,18 @@ impl<'a> TransactionContextManager<'a> {
 #[cfg(test)]
 mod tests {
     //use std::ffi::CString;
-    use super::*;
     use inkwell::values::InstructionOpcode;
     use inkwell::values::BasicValue;
+
+    use super::*;
     use evmjit::compiler::evm_compiler::MainFuncCreator;
     use evmjit::GetOperandValue;
+    use evmjit::compiler::runtime::env::EnvDataType;
 
     #[test]
     fn test_tx_ctx_type() {
         let context = Context::create();
-        let tx_ctx_type_singleton = TransactionContextType::get_instance(&context);
+        let tx_ctx_type_singleton = TransactionContextType::new(&context);
         let tx_ctx = tx_ctx_type_singleton.get_type();
 
         assert!(TransactionContextType::is_transaction_context_type (&tx_ctx));
@@ -278,14 +276,14 @@ mod tests {
 
     #[test]
     fn test_load_txctx_fn_instructions() {
-        let context = Context::create();
-        let module = context.create_module("evm_module");
-        let builder = context.create_builder();
+        let jitctx = JITContext::new();
+        let context = jitctx.llvm_context();
+        let module = jitctx.module();
 
         // Need to create main function before TransactionContextManager otherwise we will crash
-        MainFuncCreator::new ("main", &context, &builder, &module);
+        MainFuncCreator::new ("main", &jitctx);
         
-        TransactionContextManager::new(&context, &builder, &module);
+        TransactionContextManager::new(&jitctx);
         let load_tx_ctx_fn_optional = module.get_function ("loadTxCtx");
         assert!(load_tx_ctx_fn_optional != None);
 
@@ -420,14 +418,14 @@ mod tests {
 
     #[test]
     fn test_transaction_context_manager() {
-        let context = Context::create();
-        let module = context.create_module("my_module");
-        let builder = context.create_builder();
+        let jitctx = JITContext::new();
+        let context = jitctx.llvm_context();
+        let module = jitctx.module();
 
         // Need to create main function before TransactionConextManager otherwise we will crash
-        MainFuncCreator::new ("main", &context, &builder, &module);
+        MainFuncCreator::new ("main", &jitctx);
         
-        TransactionContextManager::new(&context, &builder, &module);
+        TransactionContextManager::new(&jitctx);
         let main_fn_optional = module.get_function ("main");
         assert!(main_fn_optional != None);
 
@@ -485,13 +483,11 @@ mod tests {
 
     #[test]
     fn test_get_tx_ctx_type() {
-        let context = Context::create();
-        let module = context.create_module("my_module");
-        let builder = context.create_builder();
+        let jitctx = JITContext::new();
 
         // Need to create main function before TransactionConextManager otherwise we will crash
-        MainFuncCreator::new ("main", &context, &builder, &module);
-        let manager = TransactionContextManager::new(&context, &builder, &module);
+        MainFuncCreator::new ("main", &jitctx);
+        let manager = TransactionContextManager::new(&jitctx);
 
         let tx_type = manager.get_tx_ctx_type().get_type();
         assert!(TransactionContextType::is_transaction_context_type (&tx_type));

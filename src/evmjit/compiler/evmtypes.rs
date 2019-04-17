@@ -1,14 +1,12 @@
 #![allow(dead_code)]
 
-use singletonum::{Singleton, SingletonInit};
 use inkwell::context::Context;
 use inkwell::types::IntType;
 use inkwell::types::PointerType;
 use inkwell::types::VoidType;
 use inkwell::AddressSpace;
 
-#[derive(Debug, Singleton)]
-
+#[derive(Debug)]
 pub struct EvmTypes {
     word_type: IntType,
     word_ptr_type: PointerType,
@@ -24,13 +22,8 @@ pub struct EvmTypes {
     address_ptr_type: PointerType,
 }
 
-unsafe impl Sync for EvmTypes {}
-unsafe impl Send for EvmTypes {}
-
-impl SingletonInit for EvmTypes {
-    type Init = Context;
-    
-    fn init(context: &Context) -> Self {
+impl EvmTypes {
+    pub fn new(context: &Context) -> Self {
         let word_t = context.custom_width_int_type(256);
         let word_ptr_t = word_t.ptr_type(AddressSpace::Generic);
         let bool_t = context.bool_type();
@@ -58,9 +51,7 @@ impl SingletonInit for EvmTypes {
             address_ptr_type: address_t.ptr_type(AddressSpace::Generic)
         }
     }
-}
 
-impl EvmTypes {
     pub fn get_word_type(&self) -> IntType {
         self.word_type
     }
@@ -113,7 +104,7 @@ impl EvmTypes {
 #[test]
 fn test_evmtypes() {
     let context = Context::create();
-    let evm_type_singleton = EvmTypes::get_instance(&context);
+    let evm_type_singleton = EvmTypes::new(&context);
     assert_eq!(evm_type_singleton.get_word_type().get_bit_width(), 256);
 
     let evm_word_ptr = evm_type_singleton.get_word_ptr_type();
