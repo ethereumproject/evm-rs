@@ -77,7 +77,8 @@ impl TransactionContextType {
             return false;
         }
 
-        if a_struct.get_name() != Some(&*CString::new("evm.txctx").unwrap()) {
+
+        if a_struct.get_name().unwrap() != &*CString::new("evm.txctx").unwrap() {
             return false;
         }
 
@@ -171,6 +172,7 @@ pub struct TransactionContextManager<'a> {
     m_tx_ctx: PointerValue,
     m_load_tx_ctx_fn: FunctionValue,
     m_context: &'a JITContext,
+    m_tx_ctx_type: TransactionContextType
 }
 
 impl<'a> TransactionContextManager<'a> {
@@ -183,9 +185,9 @@ impl<'a> TransactionContextManager<'a> {
         builder.build_store(tx_loaded, bool_t.const_int(0, false));
 
         let env_data_singleton = jitctx.env();
-        let tx_ctx_singleton = jitctx.txctx();
+        let tx_ctx_type = TransactionContextType::new(context);
 
-        let tx_ctx_alloca = builder.build_alloca(tx_ctx_singleton.get_type(), "txctx");
+        let tx_ctx_alloca = builder.build_alloca(tx_ctx_type.get_type(), "txctx");
 
         let tx_ctx_fn_t = context.void_type().fn_type(
             &[
@@ -240,11 +242,12 @@ impl<'a> TransactionContextManager<'a> {
             m_tx_ctx: tx_ctx_alloca,
             m_load_tx_ctx_fn: load_tx_ctx_fn,
             m_context: jitctx,
+            m_tx_ctx_type: tx_ctx_type
         }
     }
 
     pub fn get_tx_ctx_type(&self) -> &TransactionContextType {
-        self.m_context.txctx()
+        &self.m_tx_ctx_type
     }
 
     pub fn get_tx_ctx_loaded_ssa_var(&self) -> PointerValue {
@@ -261,7 +264,7 @@ impl<'a> TransactionContextManager<'a> {
 }
 
 #[cfg(test)]
-mod tests {
+mod txctx_tests {
     //use std::ffi::CString;
     use inkwell::values::BasicValue;
     use inkwell::values::InstructionOpcode;

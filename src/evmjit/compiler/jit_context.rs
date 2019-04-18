@@ -7,7 +7,7 @@ use evmjit::compiler::evmconstants::EvmConstants;
 use evmjit::compiler::evmtypes::EvmTypes;
 use evmjit::compiler::memory::mem_representation::MemoryRepresentationType;
 use evmjit::compiler::runtime::{
-    env::EnvDataType, rt_data_type::RuntimeDataType, rt_type::RuntimeType, txctx::TransactionContextType,
+    env::EnvDataType, rt_data_type::RuntimeDataType, rt_type::RuntimeType
 };
 
 /// The context for the JIT. Includes data that is bound to the LLVM context for a given execution.
@@ -25,8 +25,6 @@ pub struct JITContext {
     m_evm_constants: EvmConstants,
     /// The LLVM attribute provider.
     m_attrs: LLVMAttributeFactory,
-    /// The transaction context type provider.
-    m_txctx: TransactionContextType,
     /// The runtime data type provider.
     m_rt_data: RuntimeDataType,
     /// The environment type provider.
@@ -45,7 +43,6 @@ impl JITContext {
         let types = EvmTypes::new(&ctx);
         let constants = EvmConstants::new(&ctx);
         let attr_factory = LLVMAttributeFactory::new(&ctx);
-        let txctx = TransactionContextType::new(&ctx);
         let rt_data = RuntimeDataType::new(&ctx);
         let env = EnvDataType::new(&ctx);
         let memrep = MemoryRepresentationType::new(&ctx);
@@ -58,7 +55,6 @@ impl JITContext {
             m_evm_types: types,
             m_evm_constants: constants,
             m_attrs: attr_factory,
-            m_txctx: txctx,
             m_rt_data: rt_data,
             m_env: env,
             m_memrep: memrep,
@@ -89,10 +85,6 @@ impl JITContext {
 
     pub fn attributes(&self) -> &LLVMAttributeFactory {
         &self.m_attrs
-    }
-
-    pub fn txctx(&self) -> &TransactionContextType {
-        &self.m_txctx
     }
 
     pub fn rt_data(&self) -> &RuntimeDataType {
