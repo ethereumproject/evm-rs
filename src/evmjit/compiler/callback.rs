@@ -3,23 +3,10 @@ use evmjit::compiler::runtime::env::EnvDataType;
 use evmjit::compiler::util::funcbuilder::*;
 
 use inkwell::context::Context;
-use inkwell::builder::Builder;
-use inkwell::module::Module;
 use inkwell::types::FunctionType;
-use singletonum::{Singleton, SingletonInit};
-
-/// Structure handling JIT callback interface. 
-/// CallbackInterfaceManager is responsible for handling linkage needed for EVM opcodes that
-/// access state or otherwise cannot be implemented solely through codegen.
-pub struct CallbackInterfaceManager<'a> {
-    m_context: &'a Context,
-    m_builder: &'a Builder,
-    m_module: &'a Module,
-}
-
 
 /// CallbackTypes provides function signatures for each callback function provided to the JIT.
-#[derive(Singleton)]
+#[derive(Debug)]
 pub struct CallbackTypes {
     m_storageload: FunctionType,
     m_storagestore: FunctionType,
@@ -44,20 +31,10 @@ pub struct CallbackTypes {
 unsafe impl Sync for CallbackTypes {}
 unsafe impl Send for CallbackTypes {}
 
-impl<'a> CallbackInterfaceManager<'a> {
-    pub fn new(context: &'a Context, builder: &'a Builder, module: &'a Module) -> CallbackInterfaceManager<'a> {
-        CallbackInterfaceManager {
-            m_context: context,
-            m_builder: builder,
-            m_module: module,
-        }
-    }
-}
-
 macro_rules! get_type_impl {
     ($method_name:ident, $member: ident) => {
         pub fn $method_name(&self) -> FunctionType {
-            self.$member 
+            self.$member
         }
     }
 }
@@ -77,12 +54,8 @@ impl CallbackTypes {
     get_type_impl!(get_type_call, m_call);
 }
 
-impl SingletonInit for CallbackTypes {
-    type Init = Context;
-    fn init(context: &Context) -> Self {
-        // Access EVM and environment types
-        let evm = EvmTypes::get_instance(context);
-        let env = EnvDataType::get_instance(context);
+impl CallbackTypes {
+    pub fn new(context: &Context, evm: &EvmTypes, env: &EnvDataType) -> Self {
         // TODO: double check these signatures
         CallbackTypes {
             m_storageload: FunctionTypeBuilder::new(context)
@@ -105,9 +78,7 @@ impl SingletonInit for CallbackTypes {
                 .arg(evm.get_word_ptr_type())
                 .build()
                 .unwrap(),
-            m_calldataload: FunctionTypeBuilder::new(context)
-                .build()
-                .unwrap(),
+            m_calldataload: FunctionTypeBuilder::new(context).build().unwrap(),
             m_create: FunctionTypeBuilder::new(context)
                 .arg(env.get_ptr_type())
                 .arg(evm.get_gas_ptr_type())
@@ -175,18 +146,19 @@ impl SingletonInit for CallbackTypes {
 
 #[cfg(test)]
 mod tests {
+    use super::super::JITContext;
     use super::*;
 
     macro_rules! smoke_get_method {
         ($testname:ident, $method:ident) => {
             #[test]
             fn $testname() {
-                let ctx = Context::create();
-                let types = CallbackTypes::get_instance(&ctx);
+                let ctx = JITContext::new();
+                let types = ctx.callback_types();
 
                 let _result = types.$method();
             }
-        }
+        };
     }
 
     smoke_get_method!(sload_signature, get_type_sload);

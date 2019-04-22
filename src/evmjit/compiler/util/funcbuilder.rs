@@ -3,9 +3,9 @@ use std::error::Error;
 use std::fmt;
 
 use inkwell::context::Context;
-use inkwell::types::FunctionType;
 use inkwell::types::AnyTypeEnum;
 use inkwell::types::BasicTypeEnum;
+use inkwell::types::FunctionType;
 
 /// Function type builder. Return type defaults to Void.
 pub struct FunctionTypeBuilder<'a> {
@@ -15,7 +15,7 @@ pub struct FunctionTypeBuilder<'a> {
 }
 
 /// Function type builder error.
-#[derive(PartialEq)]
+#[derive(PartialEq, Debug)]
 pub enum FunctionTypeBuilderError {
     InvalidReturnType,
     Custom(String),
@@ -30,7 +30,7 @@ impl<'a> FunctionTypeBuilder<'a> {
             m_args: Vec::new(),
         }
     }
-    
+
     /// Consume the builder and return an LLVM function signature.
     pub fn build(self) -> Result<FunctionType, FunctionTypeBuilderError> {
         // Arguments don't need validation because BasicTypeEnum doesn't include any
@@ -47,7 +47,7 @@ impl<'a> FunctionTypeBuilder<'a> {
                 AnyTypeEnum::StructType(t) => Ok(t.fn_type(self.m_args.as_slice(), false)),
                 AnyTypeEnum::VectorType(t) => Ok(t.fn_type(self.m_args.as_slice(), false)),
                 AnyTypeEnum::VoidType(t) => Ok(t.fn_type(self.m_args.as_slice(), false)),
-                _ => panic!() // this should never be reached because of the previous validation step.
+                _ => panic!(), // this should never be reached because of the previous validation step.
             }
         }
     }
@@ -63,21 +63,23 @@ impl<'a> FunctionTypeBuilder<'a> {
     }
 
     /// Set the return type of the function.
-    pub fn returns<T>(mut self, ret: T) -> Self 
-        where T: Into<AnyTypeEnum>
+    pub fn returns<T>(mut self, ret: T) -> Self
+    where
+        T: Into<AnyTypeEnum>,
     {
         self.m_ret = ret.into();
         self
     }
-    
+
     /// Add an argument to the end of the builder's argument list.
     pub fn arg<T>(mut self, argument: T) -> Self
-        where T: Into<BasicTypeEnum>
+    where
+        T: Into<BasicTypeEnum>,
     {
         self.m_args.push(argument.into());
         self
     }
-    
+
     /// Ensure the function built has a valid return type. True if valid.
     fn return_is_valid(&self) -> bool {
         !self.m_ret.is_function_type()
@@ -92,21 +94,7 @@ impl From<String> for FunctionTypeBuilderError {
 
 impl fmt::Display for FunctionTypeBuilderError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            f,
-            "{}",
-            self.description(),
-        )
-    }
-}
-
-impl fmt::Debug for FunctionTypeBuilderError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            f,
-            "{}",
-            self.description(),
-        )
+        write!(f, "{}", self.description(),)
     }
 }
 
@@ -127,14 +115,11 @@ impl Error for FunctionTypeBuilderError {
 mod tests {
     use super::*;
     use evmjit::compiler::evmtypes::EvmTypes;
-    use singletonum::Singleton;
 
     #[test]
     fn builder_noret_noargs() {
         let context = Context::create();
-        let func = FunctionTypeBuilder::new(&context)
-            .build()
-            .unwrap();
+        let func = FunctionTypeBuilder::new(&context).build().unwrap();
 
         assert_eq!(func, context.void_type().fn_type(&[], false));
     }
@@ -164,7 +149,7 @@ mod tests {
     fn builder_evm_func() {
         // test a SHA3 callback signature
         let context = Context::create();
-        let types = EvmTypes::get_instance(&context);
+        let types = EvmTypes::new(&context);
         let func = FunctionTypeBuilder::new(&context)
             .returns(context.void_type())
             .arg(types.get_byte_ptr_type())
@@ -173,12 +158,10 @@ mod tests {
             .unwrap();
 
         assert_eq!(
-            func, 
-            context.void_type()
-                .fn_type(
-                    &[types.get_byte_ptr_type().into(), types.get_size_type().into()],
-                    false
-                )
+            func,
+            context
+                .void_type()
+                .fn_type(&[types.get_byte_ptr_type().into(), types.get_size_type().into()], false)
         );
     }
 }
