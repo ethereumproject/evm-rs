@@ -351,8 +351,6 @@ impl<'a> MemoryRepresentation<'a> {
         }
     }
 
-    // llvm::Value* getPtr(llvm::Value* _arrayPtr, llvm::Value* _index) { return m_getPtrFunc.call(m_builder, {_arrayPtr, _index}); }
-
     pub fn get_mem_ptr(&self, mem: PointerValue, index: IntValue) -> PointerValue {
         let call_site = self.m_context.builder().build_call(
             self.m_func_mgr.get_evm_mem_ptr_func(),
@@ -362,6 +360,10 @@ impl<'a> MemoryRepresentation<'a> {
         assert!(call_site.try_as_basic_value().left().is_some());
         let ret = call_site.try_as_basic_value().left().unwrap();
         ret.into_pointer_value()
+    }
+
+    pub fn get_mem(&self) -> PointerValue {
+        self.m_memory
     }
 
     pub fn extend_memory_size(&self, mem: PointerValue, size: IntValue) {

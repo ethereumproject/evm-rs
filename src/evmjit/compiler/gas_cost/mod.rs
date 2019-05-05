@@ -143,7 +143,7 @@ impl<'a, P: Patch> BasicBlockGasManager<'a, P> {
         }
     }
 
-    fn count_variable_cost(&self, cost: IntValue, exc_mgr: &ExceptionManager) {
+    pub fn count_variable_cost(&self, cost: IntValue, exc_mgr: &ExceptionManager) {
         let types_instance = self.m_context.evm_types();
         let word_type = types_instance.get_word_type();
 
