@@ -103,126 +103,180 @@ impl LLVMIntrinsicManager for LLVMIntrinsic {
             LLVMIntrinsic::Bswap => {
                 assert!(arg_type != None);
                 assert!(arg_type.unwrap().is_int_type());
+
+                let bswap_func_name = self.to_name(arg_type);
                 let module = context.module();
-                let int_bit_width = arg_type.unwrap().into_int_type().get_bit_width();
 
-                let bswap_ret_type = context.llvm_context().custom_width_int_type(int_bit_width);
+                let bswap_func_found = module.get_function(bswap_func_name);
+                if bswap_func_found.is_some() {
+                    bswap_func_found.unwrap()
+                }
+                else {
+                    let int_bit_width = arg_type.unwrap().into_int_type().get_bit_width();
 
-                let width_t = IntType::custom_width_int_type(int_bit_width);
-                let type_enum = BasicTypeEnum::IntType(width_t);
+                    let bswap_ret_type = context.llvm_context().custom_width_int_type(int_bit_width);
 
-                let bswap_func_type = bswap_ret_type.fn_type(&[type_enum.into()], false);
-                let bswap_func = module.add_function(self.to_name(arg_type), bswap_func_type, Some(External));
+                    let width_t = IntType::custom_width_int_type(int_bit_width);
+                    let type_enum = BasicTypeEnum::IntType(width_t);
 
-                let attr_factory = context.attributes();
-                bswap_func.add_attribute(0, *attr_factory.attr_nounwind());
-                bswap_func.add_attribute(0, *attr_factory.attr_readnone());
-                bswap_func.add_attribute(0, *attr_factory.attr_speculatable());
-                bswap_func
+                    let bswap_func_type = bswap_ret_type.fn_type(&[type_enum.into()], false);
+                    let bswap_func = module.add_function(bswap_func_name, bswap_func_type, Some(External));
+
+                    let attr_factory = context.attributes();
+                    bswap_func.add_attribute(0, *attr_factory.attr_nounwind());
+                    bswap_func.add_attribute(0, *attr_factory.attr_readnone());
+                    bswap_func.add_attribute(0, *attr_factory.attr_speculatable());
+                    bswap_func
+                }
             }
 
             LLVMIntrinsic::MemSet => {
                 assert!(arg_type != None);
                 assert!(arg_type.unwrap().is_int_type());
+
+                let memset_func_name = self.to_name(arg_type);
                 let module = context.module();
-                let llvm_ctx = context.llvm_context();
-                let int_bit_width = arg_type.unwrap().into_int_type().get_bit_width();
 
-                let width_t = if int_bit_width == 64 {
-                    IntType::i64_type()
-                } else {
-                    IntType::i32_type()
-                };
 
-                let type_enum = BasicTypeEnum::IntType(width_t);
-                let memset_ret_type = llvm_ctx.void_type();
-                let arg1 = llvm_ctx.i8_type().ptr_type(AddressSpace::Generic);
-                let arg2 = llvm_ctx.i8_type();
-                let arg4 = llvm_ctx.bool_type();
+                let memset_func_found = module.get_function(memset_func_name);
+                if memset_func_found.is_some() {
+                    memset_func_found.unwrap()
+                }
+                else {
+                    let llvm_ctx = context.llvm_context();
+                    let int_bit_width = arg_type.unwrap().into_int_type().get_bit_width();
 
-                let memset_func_type =
-                    memset_ret_type.fn_type(&[arg1.into(), arg2.into(), type_enum.into(), arg4.into()], false);
-                let memset_func = module.add_function(self.to_name(arg_type), memset_func_type, Some(External));
-                let attr_factory = context.attributes();
+                    let width_t = if int_bit_width == 64 {
+                        IntType::i64_type()
+                    } else {
+                        IntType::i32_type()
+                    };
 
-                memset_func.add_attribute(0, *attr_factory.attr_nounwind());
-                memset_func.add_attribute(0, *attr_factory.attr_argmemonly());
-                memset_func.add_attribute(1, *attr_factory.attr_nocapture());
-                memset_func
+                    let type_enum = BasicTypeEnum::IntType(width_t);
+                    let memset_ret_type = llvm_ctx.void_type();
+                    let arg1 = llvm_ctx.i8_type().ptr_type(AddressSpace::Generic);
+                    let arg2 = llvm_ctx.i8_type();
+                    let arg4 = llvm_ctx.bool_type();
+
+                    let memset_func_type =
+                        memset_ret_type.fn_type(&[arg1.into(), arg2.into(), type_enum.into(), arg4.into()], false);
+                    let memset_func = module.add_function(memset_func_name, memset_func_type, Some(External));
+                    let attr_factory = context.attributes();
+
+                    memset_func.add_attribute(0, *attr_factory.attr_nounwind());
+                    memset_func.add_attribute(0, *attr_factory.attr_argmemonly());
+                    memset_func.add_attribute(1, *attr_factory.attr_nocapture());
+                    memset_func
+                }
             }
 
             LLVMIntrinsic::Ctlz => {
                 let module = context.module();
-                let llvm_ctx = context.llvm_context();
-                let types_instance = context.evm_types();
-                let ctlz_ret_type = types_instance.get_word_type();
-                let arg1 = types_instance.get_word_type();
-                let arg2 = llvm_ctx.bool_type();
-                let ctlz_func_type = ctlz_ret_type.fn_type(&[arg1.into(), arg2.into()], false);
-                let ctlz_func = module.add_function(self.to_name(arg_type), ctlz_func_type, Some(External));
 
-                let attr_factory = context.attributes();
-                ctlz_func.add_attribute(0, *attr_factory.attr_nounwind());
-                ctlz_func.add_attribute(0, *attr_factory.attr_readnone());
-                ctlz_func.add_attribute(0, *attr_factory.attr_speculatable());
-                ctlz_func
+                let ctlz_func_name = self.to_name(arg_type);
+                let ctlz_func_found = module.get_function(ctlz_func_name);
+                if ctlz_func_found.is_some() {
+                    ctlz_func_found.unwrap()
+                } else {
+                    let llvm_ctx = context.llvm_context();
+                    let types_instance = context.evm_types();
+                    let ctlz_ret_type = types_instance.get_word_type();
+                    let arg1 = types_instance.get_word_type();
+                    let arg2 = llvm_ctx.bool_type();
+                    let ctlz_func_type = ctlz_ret_type.fn_type(&[arg1.into(), arg2.into()], false);
+                    let ctlz_func = module.add_function(ctlz_func_name, ctlz_func_type, Some(External));
+
+                    let attr_factory = context.attributes();
+                    ctlz_func.add_attribute(0, *attr_factory.attr_nounwind());
+                    ctlz_func.add_attribute(0, *attr_factory.attr_readnone());
+                    ctlz_func.add_attribute(0, *attr_factory.attr_speculatable());
+                    ctlz_func
+                }
             }
 
             // No type
             LLVMIntrinsic::FrameAddress => {
                 let module = context.module();
-                let llvm_ctx = context.llvm_context();
-                let frame_addr_ret_type = llvm_ctx.i8_type().ptr_type(AddressSpace::Generic);
-                let arg1 = llvm_ctx.i32_type();
-                let frame_addr_func_type = frame_addr_ret_type.fn_type(&[arg1.into()], false);
-                let frame_addr_func = module.add_function(self.to_name(arg_type), frame_addr_func_type, Some(External));
 
-                let attr_factory = context.attributes();
-                frame_addr_func.add_attribute(0, *attr_factory.attr_nounwind());
-                frame_addr_func.add_attribute(0, *attr_factory.attr_readnone());
-                frame_addr_func
+                let frame_addr_func_name = self.to_name(arg_type);
+                let frame_addr_func_found = module.get_function(frame_addr_func_name);
+                if frame_addr_func_found.is_some() {
+                    frame_addr_func_found.unwrap()
+                } else {
+                    let llvm_ctx = context.llvm_context();
+                    let frame_addr_ret_type = llvm_ctx.i8_type().ptr_type(AddressSpace::Generic);
+                    let arg1 = llvm_ctx.i32_type();
+                    let frame_addr_func_type = frame_addr_ret_type.fn_type(&[arg1.into()], false);
+                    let frame_addr_func = module.add_function(frame_addr_func_name, frame_addr_func_type, Some(External));
+
+                    let attr_factory = context.attributes();
+                    frame_addr_func.add_attribute(0, *attr_factory.attr_nounwind());
+                    frame_addr_func.add_attribute(0, *attr_factory.attr_readnone());
+                    frame_addr_func
+                }
             }
 
             // No type
             LLVMIntrinsic::LongJmp => {
                 let module = context.module();
-                let llvm_ctx = context.llvm_context();
-                let longjmp_ret_type = llvm_ctx.void_type();
-                let arg1 = llvm_ctx.i8_type().ptr_type(AddressSpace::Generic);
-                let longjmp_func_type = longjmp_ret_type.fn_type(&[arg1.into()], false);
-                let longjmp_func = module.add_function(self.to_name(arg_type), longjmp_func_type, Some(External));
 
-                let attr_factory = context.attributes();
-                longjmp_func.add_attribute(0, *attr_factory.attr_nounwind());
-                longjmp_func.add_attribute(0, *attr_factory.attr_noreturn());
-                longjmp_func
+                let longjmp_func_name = self.to_name(arg_type);
+                let longjmp_func_found = module.get_function(longjmp_func_name);
+                if longjmp_func_found.is_some() {
+                    longjmp_func_found.unwrap()
+                } else {
+                    let llvm_ctx = context.llvm_context();
+                    let longjmp_ret_type = llvm_ctx.void_type();
+                    let arg1 = llvm_ctx.i8_type().ptr_type(AddressSpace::Generic);
+                    let longjmp_func_type = longjmp_ret_type.fn_type(&[arg1.into()], false);
+                    let longjmp_func = module.add_function(longjmp_func_name, longjmp_func_type, Some(External));
+
+                    let attr_factory = context.attributes();
+                    longjmp_func.add_attribute(0, *attr_factory.attr_nounwind());
+                    longjmp_func.add_attribute(0, *attr_factory.attr_noreturn());
+                    longjmp_func
+                }
             }
 
             // No type
             LLVMIntrinsic::StackSave => {
                 let module = context.module();
-                let llvm_ctx = context.llvm_context();
-                let stack_save_ret_type = llvm_ctx.i8_type().ptr_type(AddressSpace::Generic);
-                let stack_save_func_type = stack_save_ret_type.fn_type(&[], false);
-                let stack_save_func = module.add_function(self.to_name(arg_type), stack_save_func_type, Some(External));
 
-                let attr_factory = context.attributes();
-                stack_save_func.add_attribute(0, *attr_factory.attr_nounwind());
-                stack_save_func
+                let stacksave_func_name = self.to_name(arg_type);
+                let stacksave_func_found = module.get_function(stacksave_func_name);
+                if stacksave_func_found.is_some() {
+                    stacksave_func_found.unwrap()
+                } else {
+                    let llvm_ctx = context.llvm_context();
+                    let stack_save_ret_type = llvm_ctx.i8_type().ptr_type(AddressSpace::Generic);
+                    let stack_save_func_type = stack_save_ret_type.fn_type(&[], false);
+                    let stack_save_func = module.add_function(stacksave_func_name, stack_save_func_type, Some(External));
+
+                    let attr_factory = context.attributes();
+                    stack_save_func.add_attribute(0, *attr_factory.attr_nounwind());
+                    stack_save_func
+                }
             }
 
             // No type
             LLVMIntrinsic::SetJmp => {
                 let module = context.module();
-                let llvm_ctx = context.llvm_context();
-                let setjmp_ret_type = llvm_ctx.i32_type();
-                let arg1 = llvm_ctx.i8_type().ptr_type(AddressSpace::Generic);
-                let setjmp_func_type = setjmp_ret_type.fn_type(&[arg1.into()], false);
-                let setjmp_func = module.add_function(self.to_name(arg_type), setjmp_func_type, Some(External));
 
-                let attr_factory = context.attributes();
-                setjmp_func.add_attribute(0, *attr_factory.attr_nounwind());
-                setjmp_func
+                let setjmp_func_name = self.to_name(arg_type);
+                let setjmp_func_found = module.get_function(setjmp_func_name);
+                if setjmp_func_found.is_some() {
+                    setjmp_func_found.unwrap()
+                } else {
+                    let llvm_ctx = context.llvm_context();
+                    let setjmp_ret_type = llvm_ctx.i32_type();
+                    let arg1 = llvm_ctx.i8_type().ptr_type(AddressSpace::Generic);
+                    let setjmp_func_type = setjmp_ret_type.fn_type(&[arg1.into()], false);
+                    let setjmp_func = module.add_function(setjmp_func_name, setjmp_func_type, Some(External));
+
+                    let attr_factory = context.attributes();
+                    setjmp_func.add_attribute(0, *attr_factory.attr_nounwind());
+                    setjmp_func
+                }
             }
         }
     }
