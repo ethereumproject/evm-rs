@@ -1,7 +1,7 @@
 #![allow(dead_code)]
-use evmjit::compiler::external_declarations::ExternalFunctionManager;
 use evmjit::compiler::intrinsics::LLVMIntrinsic;
 use evmjit::compiler::intrinsics::LLVMIntrinsicManager;
+use evmjit::compiler::{DeclarationManager, ExternalFunctionManager};
 use evmjit::BasicTypeEnumCompare;
 use inkwell::context::Context;
 use inkwell::module::Linkage::*;
@@ -186,7 +186,7 @@ impl<'a> MemoryRepresentationFunctionManager<'a> {
                     "extendedSize",
                 );
 
-                let realloc_func = self.m_external_func_mgr.get_realloc_decl();
+                let realloc_func = self.m_external_func_mgr.get_decl("realloc");
                 let alloc_mem = temp_builder.build_call(realloc_func, &[data.into(), extended_size.into()], "newMem");
                 let alloc_mem_as_ptr = alloc_mem.try_as_basic_value().left().unwrap().into_pointer_value();
                 let alloc_mem_as_value = alloc_mem.try_as_basic_value().left().unwrap();

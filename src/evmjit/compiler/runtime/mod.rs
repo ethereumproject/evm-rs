@@ -11,7 +11,7 @@ use self::rt_data_type::RuntimeDataTypeFields::Gas;
 use self::rt_type::RuntimeTypeManager;
 use self::stack_init::StackAllocator;
 use self::txctx::TransactionContextManager;
-use evmjit::compiler::external_declarations::ExternalFunctionManager;
+use evmjit::compiler::{DeclarationManager, ExternalFunctionManager};
 use evmjit::ModuleLookup;
 use inkwell::basic_block::BasicBlock;
 use inkwell::types::PointerType;
@@ -137,7 +137,7 @@ impl MainPrologue {
         let types_instance = jitctx.evm_types();
         let phi = temp_builder.build_phi(types_instance.get_contract_return_type(), "ret");
 
-        let free_func = decl_factory.get_free_decl();
+        let free_func = decl_factory.get_decl("free");
 
         temp_builder.build_call(free_func, &[stack_base.into()], "");
         let index = Gas.to_index() as u32;

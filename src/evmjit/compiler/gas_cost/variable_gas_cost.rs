@@ -203,7 +203,7 @@ fn native_log_base2(gas_val: Gas) -> usize {
 mod tests {
     use super::*;
     use evmjit::compiler::evm_compiler::MainFuncCreator;
-    use evmjit::compiler::external_declarations::ExternalFunctionManager;
+    use evmjit::compiler::{ExternalFunctionManager, DeclarationManager};
     use evmjit::compiler::intrinsics::LLVMIntrinsic;
     use evmjit::compiler::intrinsics::LLVMIntrinsicManager;
     use evmjit::compiler::runtime::RuntimeManager;

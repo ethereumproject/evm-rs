@@ -77,7 +77,6 @@ impl TransactionContextType {
             return false;
         }
 
-
         if a_struct.get_name().unwrap() != &*CString::new("evm.txctx").unwrap() {
             return false;
         }
@@ -172,7 +171,7 @@ pub struct TransactionContextManager<'a> {
     m_tx_ctx: PointerValue,
     m_load_tx_ctx_fn: FunctionValue,
     m_context: &'a JITContext,
-    m_tx_ctx_type: TransactionContextType
+    m_tx_ctx_type: TransactionContextType,
 }
 
 impl<'a> TransactionContextManager<'a> {
@@ -242,7 +241,7 @@ impl<'a> TransactionContextManager<'a> {
             m_tx_ctx: tx_ctx_alloca,
             m_load_tx_ctx_fn: load_tx_ctx_fn,
             m_context: jitctx,
-            m_tx_ctx_type: tx_ctx_type
+            m_tx_ctx_type: tx_ctx_type,
         }
     }
 
