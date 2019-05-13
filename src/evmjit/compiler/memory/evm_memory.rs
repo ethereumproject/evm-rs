@@ -68,17 +68,17 @@ impl<'a, P: Patch> MemoryFuncDeclarationManager<'a, P> {
             let offset_in_mem_val = offset_in_mem.into_int_value();
 
             assert!(alloc_mem_func.get_nth_param(2).is_some());
-            let size_in_mem = alloc_mem_func.get_nth_param(1).unwrap();
+            let size_in_mem = alloc_mem_func.get_nth_param(2).unwrap();
             size_in_mem.into_int_value().set_name("memSize");
 
             let size_in_mem_val = size_in_mem.into_int_value();
 
             assert!(alloc_mem_func.get_nth_param(3).is_some());
-            let long_jmp_buf = alloc_mem_func.get_nth_param(1).unwrap();
+            let long_jmp_buf = alloc_mem_func.get_nth_param(3).unwrap();
             long_jmp_buf.into_pointer_value().set_name("longJumpBuf");
 
             assert!(alloc_mem_func.get_nth_param(4).is_some());
-            let gas = alloc_mem_func.get_nth_param(1).unwrap();
+            let gas = alloc_mem_func.get_nth_param(4).unwrap();
             gas.into_pointer_value().set_name("gas");
 
             let temp_builder = context.create_builder();
@@ -205,7 +205,7 @@ impl<'a, P: Patch> MemoryFuncDeclarationManager<'a, P> {
             index_in_mem.into_int_value().set_name("index");
 
             assert!(mstore8_func.get_nth_param(2).is_some());
-            let value_to_store = mstore8_func.get_nth_param(1).unwrap();
+            let value_to_store = mstore8_func.get_nth_param(2).unwrap();
             value_to_store.into_int_value().set_name("value");
 
             let temp_builder = context.create_builder();
@@ -253,7 +253,7 @@ impl<'a, P: Patch> MemoryFuncDeclarationManager<'a, P> {
             index_in_mem.into_int_value().set_name("index");
 
             assert!(mstore_func.get_nth_param(2).is_some());
-            let value_to_store_arg = mstore_func.get_nth_param(1).unwrap();
+            let value_to_store_arg = mstore_func.get_nth_param(2).unwrap();
             value_to_store_arg.into_int_value().set_name("value");
 
             let temp_builder = context.create_builder();
@@ -477,7 +477,7 @@ mod tests {
 
         let gas_manager: BasicBlockGasManager<EmbeddedPatch> = BasicBlockGasManager::new(&jitctx, &rt_manager);
         let bb_after_entry = main.get_entry_bb().get_next_basic_block();
-        let exc_manager = ExceptionManager::new(&jitctx, &bb_afer_entry, &main.get_abort_bb());
+        let exc_manager = ExceptionManager::new(&jitctx, &bb_after_entry.unwrap(), &main.get_abort_bb());
         let _memory: EvmMemory<EmbeddedPatch> = EvmMemory::new(&jitctx, &gas_manager, &rt_manager, &decl_factory, &exc_manager);
         module.print_to_stderr()
     }

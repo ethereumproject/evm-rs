@@ -25,6 +25,7 @@ lazy_static = "0.2"
 singletonum = "0.2.0"
 llvm-sys = "70.0"
 inkwell = { git = "https://github.com/TheDan64/inkwell", branch = "llvm7-0" }
+rand = "0.6"
 
 [dev-dependencies]
 ethereum-hexutil = "0.2"

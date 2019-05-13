@@ -145,6 +145,7 @@ extern crate num_bigint;
 extern crate inkwell;
 extern crate singletonum;
 extern crate llvm_sys;
+extern crate rand;
 
 mod util;
 mod memory;

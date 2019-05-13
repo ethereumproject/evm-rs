@@ -11,5 +11,6 @@ pub mod jit_context;
 pub mod memory;
 pub mod runtime;
 pub mod stack;
+pub mod runtime_functions;
 
 pub use self::jit_context::JITContext;
