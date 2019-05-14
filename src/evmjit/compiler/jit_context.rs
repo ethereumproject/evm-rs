@@ -5,6 +5,7 @@ use inkwell::module::Module;
 use evmjit::compiler::attributes::LLVMAttributeFactory;
 use evmjit::compiler::evmconstants::EvmConstants;
 use evmjit::compiler::evmtypes::EvmTypes;
+use evmjit::compiler::callback::CallbackTypes;
 use evmjit::compiler::memory::mem_representation::MemoryRepresentationType;
 use evmjit::compiler::runtime::{
     env::EnvDataType, rt_data_type::RuntimeDataType, rt_type::RuntimeType
@@ -29,6 +30,8 @@ pub struct JITContext {
     m_rt_data: RuntimeDataType,
     /// The environment type provider.
     m_env: EnvDataType,
+    /// The callback signature provider.
+    m_callbacks: CallbackTypes,
     /// The memory representation type provider.
     m_memrep: MemoryRepresentationType,
     /// The runtime type provider.
@@ -45,6 +48,7 @@ impl JITContext {
         let attr_factory = LLVMAttributeFactory::new(&ctx);
         let rt_data = RuntimeDataType::new(&ctx);
         let env = EnvDataType::new(&ctx);
+        let callbacks = CallbackTypes::new(&ctx, &types, &env);
         let memrep = MemoryRepresentationType::new(&ctx);
         let rt = RuntimeType::new(&ctx, &rt_data, &env, &memrep);
 
@@ -57,6 +61,7 @@ impl JITContext {
             m_attrs: attr_factory,
             m_rt_data: rt_data,
             m_env: env,
+            m_callbacks: callbacks,
             m_memrep: memrep,
             m_rt: rt,
         }
@@ -93,6 +98,10 @@ impl JITContext {
 
     pub fn env(&self) -> &EnvDataType {
         &self.m_env
+    }
+
+    pub fn callback_types(&self) -> &CallbackTypes {
+        &self.m_callbacks
     }
 
     pub fn memrep(&self) -> &MemoryRepresentationType {
