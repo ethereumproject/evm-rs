@@ -18,6 +18,7 @@ use std::cell::RefCell;
 use std::ffi::CString;
 
 use super::super::JITContext;
+use evmjit::compiler::util::funcbuilder::*;
 
 #[derive(Debug)]
 
@@ -131,7 +132,13 @@ impl<'a> MemoryRepresentationFunctionManager<'a> {
             let arg1 = self.m_context.memrep().get_ptr_type();
             let arg2 = types_instance.get_size_type();
 
-            let extend_evm_mem_fn_type = ret_type.fn_type(&[arg1.into(), arg2.into()], false);
+            let extend_evm_mem_fn_type = FunctionTypeBuilder::new(context)
+                .returns(ret_type)
+                .arg(arg1)
+                .arg(arg2)
+                .build()
+                .unwrap();
+
             let extend_evm_mem_func =
                 self.m_context
                     .module()
@@ -243,9 +250,13 @@ impl<'a> MemoryRepresentationFunctionManager<'a> {
             let types_instance = self.m_context.evm_types();
             let arg1 = self.m_context.memrep().get_ptr_type();
             let arg2 = types_instance.get_size_type();
-            let evm_mem_ptr_fn_type = types_instance
-                .get_word_ptr_type()
-                .fn_type(&[arg1.into(), arg2.into()], false);
+
+            let evm_mem_ptr_fn_type = FunctionTypeBuilder::new(self.m_context.llvm_context())
+                .returns(types_instance.get_word_ptr_type())
+                .arg(arg1)
+                .arg(arg2)
+                .build()
+                .unwrap();
 
             let evm_mem_func = self
                 .m_context

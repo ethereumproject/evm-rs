@@ -4,6 +4,7 @@ use inkwell::types::IntType;
 use inkwell::values::FunctionValue;
 use inkwell::AddressSpace;
 
+use super::util::funcbuilder::*;
 use super::JITContext;
 
 static FRAME_ADDRESS_INTRINSIC_NAME: &str = "llvm.frameaddress";
@@ -119,7 +120,12 @@ impl LLVMIntrinsicManager for LLVMIntrinsic {
                     let width_t = IntType::custom_width_int_type(int_bit_width);
                     let type_enum = BasicTypeEnum::IntType(width_t);
 
-                    let bswap_func_type = bswap_ret_type.fn_type(&[type_enum.into()], false);
+                    let bswap_func_type = FunctionTypeBuilder::new(context.llvm_context())
+                        .returns(bswap_ret_type)
+                        .arg(type_enum)
+                        .build()
+                        .unwrap();
+
                     let bswap_func = module.add_function(bswap_func_name, bswap_func_type, Some(External));
 
                     let attr_factory = context.attributes();
@@ -136,7 +142,6 @@ impl LLVMIntrinsicManager for LLVMIntrinsic {
 
                 let memset_func_name = self.to_name(arg_type);
                 let module = context.module();
-
 
                 let memset_func_found = module.get_function(memset_func_name);
                 if memset_func_found.is_some() {
@@ -158,8 +163,15 @@ impl LLVMIntrinsicManager for LLVMIntrinsic {
                     let arg2 = llvm_ctx.i8_type();
                     let arg4 = llvm_ctx.bool_type();
 
-                    let memset_func_type =
-                        memset_ret_type.fn_type(&[arg1.into(), arg2.into(), type_enum.into(), arg4.into()], false);
+                    let memset_func_type = FunctionTypeBuilder::new(llvm_ctx)
+                        .returns(memset_ret_type)
+                        .arg(arg1)
+                        .arg(arg2)
+                        .arg(type_enum)
+                        .arg(arg4)
+                        .build()
+                        .unwrap();
+
                     let memset_func = module.add_function(memset_func_name, memset_func_type, Some(External));
                     let attr_factory = context.attributes();
 
@@ -183,7 +195,12 @@ impl LLVMIntrinsicManager for LLVMIntrinsic {
                     let ctlz_ret_type = types_instance.get_word_type();
                     let arg1 = types_instance.get_word_type();
                     let arg2 = llvm_ctx.bool_type();
-                    let ctlz_func_type = ctlz_ret_type.fn_type(&[arg1.into(), arg2.into()], false);
+                    let ctlz_func_type = FunctionTypeBuilder::new(llvm_ctx)
+                        .returns(ctlz_ret_type)
+                        .arg(arg1)
+                        .arg(arg2)
+                        .build()
+                        .unwrap();
                     let ctlz_func = module.add_function(ctlz_func_name, ctlz_func_type, Some(External));
 
                     let attr_factory = context.attributes();
@@ -206,7 +223,11 @@ impl LLVMIntrinsicManager for LLVMIntrinsic {
                     let llvm_ctx = context.llvm_context();
                     let frame_addr_ret_type = llvm_ctx.i8_type().ptr_type(AddressSpace::Generic);
                     let arg1 = llvm_ctx.i32_type();
-                    let frame_addr_func_type = frame_addr_ret_type.fn_type(&[arg1.into()], false);
+                    let frame_addr_func_type = FunctionTypeBuilder::new(llvm_ctx)
+                        .returns(frame_addr_ret_type)
+                        .arg(arg1)
+                        .build()
+                        .unwrap();
                     let frame_addr_func = module.add_function(frame_addr_func_name, frame_addr_func_type, Some(External));
 
                     let attr_factory = context.attributes();
@@ -228,7 +249,11 @@ impl LLVMIntrinsicManager for LLVMIntrinsic {
                     let llvm_ctx = context.llvm_context();
                     let longjmp_ret_type = llvm_ctx.void_type();
                     let arg1 = llvm_ctx.i8_type().ptr_type(AddressSpace::Generic);
-                    let longjmp_func_type = longjmp_ret_type.fn_type(&[arg1.into()], false);
+                    let longjmp_func_type = FunctionTypeBuilder::new(llvm_ctx)
+                        .returns(longjmp_ret_type)
+                        .arg(arg1)
+                        .build()
+                        .unwrap();
                     let longjmp_func = module.add_function(longjmp_func_name, longjmp_func_type, Some(External));
 
                     let attr_factory = context.attributes();
@@ -249,7 +274,10 @@ impl LLVMIntrinsicManager for LLVMIntrinsic {
                 } else {
                     let llvm_ctx = context.llvm_context();
                     let stack_save_ret_type = llvm_ctx.i8_type().ptr_type(AddressSpace::Generic);
-                    let stack_save_func_type = stack_save_ret_type.fn_type(&[], false);
+                    let stack_save_func_type = FunctionTypeBuilder::new(llvm_ctx)
+                        .returns(stack_save_ret_type)
+                        .build()
+                        .unwrap();
                     let stack_save_func = module.add_function(stacksave_func_name, stack_save_func_type, Some(External));
 
                     let attr_factory = context.attributes();
@@ -270,7 +298,11 @@ impl LLVMIntrinsicManager for LLVMIntrinsic {
                     let llvm_ctx = context.llvm_context();
                     let setjmp_ret_type = llvm_ctx.i32_type();
                     let arg1 = llvm_ctx.i8_type().ptr_type(AddressSpace::Generic);
-                    let setjmp_func_type = setjmp_ret_type.fn_type(&[arg1.into()], false);
+                    let setjmp_func_type = FunctionTypeBuilder::new(llvm_ctx)
+                        .returns(setjmp_ret_type)
+                        .arg(arg1)
+                        .build()
+                        .unwrap();
                     let setjmp_func = module.add_function(setjmp_func_name, setjmp_func_type, Some(External));
 
                     let attr_factory = context.attributes();

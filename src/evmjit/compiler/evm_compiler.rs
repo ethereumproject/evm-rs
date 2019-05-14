@@ -4,6 +4,7 @@ use inkwell::basic_block::BasicBlock;
 use inkwell::module::Linkage::*;
 use inkwell::values::FunctionValue;
 
+use super::util::funcbuilder::*;
 use super::JITContext;
 
 pub struct MainFuncCreator {
@@ -24,7 +25,12 @@ impl MainFuncCreator {
         let main_ret_type = types_instance.get_contract_return_type();
         let arg1 = context.rt().get_ptr_type();
 
-        let main_func_type = main_ret_type.fn_type(&[arg1.into()], false);
+        let main_func_type = FunctionTypeBuilder::new(context.llvm_context())
+            .returns(main_ret_type)
+            .arg(arg1)
+            .build()
+            .unwrap();
+
         let main_func = module.add_function(name, main_func_type, Some(External));
         main_func.get_first_param().unwrap().into_pointer_value().set_name("rt");
 

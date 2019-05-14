@@ -11,6 +11,7 @@ use inkwell::values::PointerValue;
 use inkwell::AddressSpace;
 use llvm_sys::LLVMCallConv::*;
 
+use evmjit::compiler::util::funcbuilder::*;
 use super::super::JITContext;
 
 #[derive(Debug)]
@@ -188,23 +189,23 @@ impl<'a> TransactionContextManager<'a> {
 
         let tx_ctx_alloca = builder.build_alloca(tx_ctx_type.get_type(), "txctx");
 
-        let tx_ctx_fn_t = context.void_type().fn_type(
-            &[
-                tx_ctx_alloca.get_type().into(),
-                env_data_singleton.get_ptr_type().into(),
-            ],
-            false,
-        );
+        let tx_ctx_fn_t = FunctionTypeBuilder::new(context)
+            .returns(context.void_type())
+            .arg(tx_ctx_alloca.get_type())
+            .arg(env_data_singleton.get_ptr_type())
+            .build()
+            .unwrap();
+
         let tx_ctx_fn = module.add_function("evm.get_tx_context", tx_ctx_fn_t, Some(External));
 
-        let load_tx_ctx_fn_t = context.void_type().fn_type(
-            &[
-                tx_loaded.get_type().into(),
-                tx_ctx_alloca.get_type().into(),
-                env_data_singleton.get_ptr_type().into(),
-            ],
-            false,
-        );
+        let load_tx_ctx_fn_t = FunctionTypeBuilder::new(context)
+            .returns(context.void_type())
+            .arg(tx_loaded.get_type())
+            .arg(tx_ctx_alloca.get_type())
+            .arg(env_data_singleton.get_ptr_type())
+            .build()
+            .unwrap();
+        
         let load_tx_ctx_fn = module.add_function("loadTxCtx", load_tx_ctx_fn_t, Some(Private));
 
         load_tx_ctx_fn.set_call_conventions(LLVMFastCallConv as u32);
