@@ -14,3 +14,4 @@ pub mod stack;
 pub mod runtime_functions;
 
 pub use self::jit_context::JITContext;
+pub use self::external_declarations::{DeclarationManager, ExternalFunctionManager};

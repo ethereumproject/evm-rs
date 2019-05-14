@@ -459,7 +459,7 @@ impl<'a, P: Patch> EvmMemory<'a, P> {
 mod tests {
     use super::*;
     use evmjit::compiler::evm_compiler::MainFuncCreator;
-    use evmjit::compiler::external_declarations::ExternalFunctionManager;
+    use evmjit::compiler::{ExternalFunctionManager, DeclarationManager};
     use patch::EmbeddedPatch;
 
     #[test]

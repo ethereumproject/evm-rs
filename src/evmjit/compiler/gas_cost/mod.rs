@@ -282,7 +282,7 @@ impl<'a, P: Patch> InstructionGasCost for BasicBlockGasManager<'a, P> {
 mod tests {
     use super::*;
     use evmjit::compiler::evm_compiler::MainFuncCreator;
-    use evmjit::compiler::external_declarations::ExternalFunctionManager;
+    use evmjit::compiler::{ExternalFunctionManager, DeclarationManager};
     use evmjit::GetOperandBasicBlock;
     use evmjit::{BasicTypeEnumCompare, GetOperandValue};
     use inkwell::attributes::Attribute;

@@ -1,7 +1,7 @@
 #![allow(dead_code)]
 
-use evmjit::compiler::external_declarations::ExternalFunctionManager;
 use evmjit::compiler::stack::EVM_MAX_STACK_SIZE;
+use evmjit::compiler::{DeclarationManager, ExternalFunctionManager};
 use inkwell::values::BasicValueEnum;
 use inkwell::values::PointerValue;
 
@@ -18,7 +18,7 @@ impl StackAllocator {
         let builder = context.builder();
         let types_instance = context.evm_types();
 
-        let malloc_func = decl_factory.get_malloc_decl();
+        let malloc_func = decl_factory.get_decl("malloc");
 
         let malloc_size = (types_instance.get_word_type().get_bit_width() / 8) * EVM_MAX_STACK_SIZE;
         let malloc_size_ir_value = context.llvm_context().i64_type().const_int(malloc_size as u64, false);

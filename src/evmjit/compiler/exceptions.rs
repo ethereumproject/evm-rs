@@ -68,7 +68,7 @@ mod tests {
 
     use super::*;
     use evmjit::compiler::evm_compiler::MainFuncCreator;
-    use evmjit::compiler::external_declarations::ExternalFunctionManager;
+    use evmjit::compiler::{ExternalFunctionManager, DeclarationManager};
     use evmjit::compiler::runtime::RuntimeManager;
     use evmjit::GetOperandBasicBlock;
     use evmjit::GetOperandValue;
