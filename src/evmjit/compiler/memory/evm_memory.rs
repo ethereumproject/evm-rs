@@ -1,6 +1,7 @@
 #![allow(dead_code)]
 
 use super::super::JITContext;
+use super::super::util::funcbuilder::*;
 use super::mem_representation::MemoryRepresentation;
 use evmjit::compiler::byte_order::byte_order_swap;
 use evmjit::compiler::external_declarations::ExternalFunctionManager;
@@ -52,7 +53,16 @@ impl<'a, P: Patch> MemoryFuncDeclarationManager<'a, P> {
             let attr_factory = self.m_context.attributes();
 
             let ret_type = context.void_type();
-            let alloc_mem_fn_type = ret_type.fn_type(&[arg1.into(), arg2.into(), arg3.into(), arg4.into(), arg5.into()], false);
+            let alloc_mem_fn_type = FunctionTypeBuilder::new(context)
+                .returns(ret_type)
+                .arg(arg1)
+                .arg(arg2)
+                .arg(arg3)
+                .arg(arg4)
+                .arg(arg5)
+                .build()
+                .unwrap();
+
             let alloc_mem_func = module.add_function("mem.allocate", alloc_mem_fn_type, Some(Private));
 
             // Function does not throw
@@ -193,7 +203,13 @@ impl<'a, P: Patch> MemoryFuncDeclarationManager<'a, P> {
             let module = self.m_context.module();
 
             let ret_type = context.void_type();
-            let mstore8_fn_type = ret_type.fn_type(&[arg1.into(), arg2.into(), arg3.into()], false);
+            let mstore8_fn_type = FunctionTypeBuilder::new(context)
+                .returns(ret_type)
+                .arg(arg1)
+                .arg(arg2)
+                .arg(arg3)
+                .build()
+                .unwrap();
             let mstore8_func = module.add_function("mstore8", mstore8_fn_type, Some(Private));
 
             assert!(mstore8_func.get_nth_param(0).is_some());
@@ -241,7 +257,13 @@ impl<'a, P: Patch> MemoryFuncDeclarationManager<'a, P> {
             let module = self.m_context.module();
 
             let ret_type = context.void_type();
-            let mstore_fn_type = ret_type.fn_type(&[arg1.into(), arg2.into(), arg3.into()], false);
+            let mstore_fn_type = FunctionTypeBuilder::new(context)
+                .returns(ret_type)
+                .arg(arg1)
+                .arg(arg2)
+                .arg(arg3)
+                .build()
+                .unwrap();
             let mstore_func = module.add_function("mstore", mstore_fn_type, Some(Private));
 
             assert!(mstore_func.get_nth_param(0).is_some());
@@ -282,13 +304,19 @@ impl<'a, P: Patch> MemoryFuncDeclarationManager<'a, P> {
 
     pub fn get_mload_func(&self, linear_memory: &'a MemoryRepresentation) -> FunctionValue {
         if self.m_evm_mem_load_func.borrow().is_none() {
+            let context = self.m_context.llvm_context();
             let types_instance = self.m_context.evm_types();
+
             let arg1 = self.m_context.memrep().get_ptr_type();
             let arg2 = types_instance.get_word_type();
             let ret_type = types_instance.get_word_type();
-            let mload_fn_type = ret_type.fn_type(&[arg1.into(), arg2.into()], false);
+            let mload_fn_type = FunctionTypeBuilder::new(context)
+                .returns(ret_type)
+                .arg(arg1)
+                .arg(arg2)
+                .build()
+                .unwrap();
 
-            let context = self.m_context.llvm_context();
             let module = self.m_context.module();
 
             let mload_func = module.add_function("mload", mload_fn_type, Some(Private));

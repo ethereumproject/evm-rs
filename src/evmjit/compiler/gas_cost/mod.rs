@@ -21,6 +21,7 @@ use inkwell::IntPredicate;
 use patch::Patch;
 use util::opcode::Opcode;
 
+use super::util::funcbuilder::*;
 use super::JITContext;
 
 pub trait InstructionGasCost {
@@ -57,7 +58,14 @@ impl GasCheckFunctionCreator {
         let arg2 = types_instance.get_gas_type();
         let arg3 = types_instance.get_byte_ptr_type();
 
-        let gas_func_type = gas_func_ret_type.fn_type(&[arg1.into(), arg2.into(), arg3.into()], false);
+        let gas_func_type = FunctionTypeBuilder::new(context)
+            .returns(gas_func_ret_type)
+            .arg(arg1)
+            .arg(arg2)
+            .arg(arg3)
+            .build()
+            .unwrap();
+
         let gas_func = module.add_function(name, gas_func_type, Some(Private));
 
         let attr_factory = jitctx.attributes();

@@ -8,6 +8,7 @@ use inkwell::types::IntType;
 use inkwell::types::BasicTypeEnum;
 use evmjit::compiler::intrinsics::LLVMIntrinsic;
 use evmjit::compiler::intrinsics::LLVMIntrinsicManager;
+use evmjit::compiler::util::funcbuilder::*;
 
 pub struct DivModDeclarationManager<'a> {
     m_context: &'a JITContext,
@@ -33,7 +34,13 @@ impl<'a> DivModDeclarationManager<'a> {
 
         let arg1 = func_type;
         let arg2 = func_type;
-        let divmod_func_type = ret_type.fn_type(&[arg1.into(), arg2.into()], false);
+        let divmod_func_type = FunctionTypeBuilder::new(context)
+            .returns(ret_type)
+            .arg(arg1)
+            .arg(arg2)
+            .build()
+            .unwrap();
+
         let divmod_func = module.add_function (func_name, divmod_func_type, Some(Private));
 
         // Function does not throw
@@ -190,7 +197,13 @@ impl<'a> DivModDeclarationManager<'a> {
             let word_type = self.m_context.evm_types().get_word_type();
             let ret_type = word_type;
 
-            let udiv_func_type = ret_type.fn_type(&[word_type.into(), word_type.into()], false);
+            let udiv_func_type = FunctionTypeBuilder::new(context)
+                .returns(ret_type)
+                .arg(word_type)
+                .arg(word_type)
+                .build()
+                .unwrap();
+
             let udiv256_func = module.add_function(func_name, udiv_func_type, Some(Private));
 
             // Function does not throw
@@ -243,7 +256,13 @@ impl<'a> DivModDeclarationManager<'a> {
             let word_type = self.m_context.evm_types().get_word_type();
             let ret_type = word_type.vec_type(2);;
 
-            let sdivrem256_func_type = ret_type.fn_type(&[word_type.into(), word_type.into()], false);
+            let sdivrem256_func_type = FunctionTypeBuilder::new(context)
+                .returns(ret_type)
+                .arg(word_type)
+                .arg(word_type)
+                .build()
+                .unwrap();
+
             let sdivrem256_func = module.add_function(func_name, sdivrem256_func_type, Some(Private));
 
             // Function does not throw
@@ -316,7 +335,13 @@ impl<'a> DivModDeclarationManager<'a> {
             let word_type = self.m_context.evm_types().get_word_type();
             let ret_type = word_type;
 
-            let sdiv_func_type = ret_type.fn_type(&[word_type.into(), word_type.into()], false);
+            let sdiv_func_type = FunctionTypeBuilder::new(context)
+                .returns(ret_type)
+                .arg(word_type)
+                .arg(word_type)
+                .build()
+                .unwrap();
+
             let sdiv256_func = module.add_function(func_name, sdiv_func_type, Some(Private));
 
             // Function does not throw

@@ -5,6 +5,7 @@ use std::cell::RefCell;
 use inkwell::module::Linkage::*;
 use inkwell::values::FunctionValue;
 
+use super::util::funcbuilder::*;
 use super::JITContext;
 
 /// Trait representing the interface to managers of LLVM function declarations.
@@ -75,9 +76,11 @@ impl<'a> ExternalFunctionManager<'a> {
         let types = self.m_context.evm_types();
         let attr_factory = self.m_context.attributes();
 
-        let malloc_fn_type = types
-            .get_word_ptr_type()
-            .fn_type(&[types.get_size_type().into()], false);
+        let malloc_fn_type = FunctionTypeBuilder::new(self.m_context.llvm_context())
+            .returns(types.get_word_ptr_type())
+            .arg(types.get_size_type())
+            .build()
+            .unwrap();
 
         let malloc_func = module.add_function("malloc", malloc_fn_type, Some(External));
 
@@ -95,7 +98,11 @@ impl<'a> ExternalFunctionManager<'a> {
         let free_ret_type = self.m_context.llvm_context().void_type();
         let arg1 = types.get_word_ptr_type();
 
-        let free_func_type = free_ret_type.fn_type(&[arg1.into()], false);
+        let free_func_type = FunctionTypeBuilder::new(self.m_context.llvm_context())
+            .returns(free_ret_type)
+            .arg(arg1)
+            .build()
+            .unwrap();
 
         let free_func = module.add_function("free", free_func_type, Some(External));
 
@@ -113,7 +120,12 @@ impl<'a> ExternalFunctionManager<'a> {
         let realloc_return_type = types.get_byte_ptr_type();
         let arg1 = types.get_byte_ptr_type();
         let arg2 = types.get_size_type();
-        let realloc_func_type = realloc_return_type.fn_type(&[arg1.into(), arg2.into()], false);
+        let realloc_func_type = FunctionTypeBuilder::new(self.m_context.llvm_context())
+            .returns(realloc_return_type)
+            .arg(arg1)
+            .arg(arg2)
+            .build()
+            .unwrap();
 
         let realloc_func = module.add_function("realloc", realloc_func_type, Some(External));
 

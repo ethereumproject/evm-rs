@@ -202,6 +202,7 @@ fn native_log_base2(gas_val: Gas) -> usize {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use evmjit::compiler::util::funcbuilder::*;
     use evmjit::compiler::evm_compiler::MainFuncCreator;
     use evmjit::compiler::{ExternalFunctionManager, DeclarationManager};
     use evmjit::compiler::intrinsics::LLVMIntrinsic;
@@ -227,7 +228,12 @@ mod tests {
         let gas_type = types_instance.get_gas_type();
 
         let i64_type = context.i64_type();
-        let fn_type = i64_type.fn_type(&[gas_type.into()], false);
+
+        let fn_type = FunctionTypeBuilder::new(context)
+            .returns(i64_type)
+            .arg(gas_type)
+            .build()
+            .unwrap();
 
         // Get declaration of ctlz
         let ctlz_decl = LLVMIntrinsic::Ctlz.get_intrinsic_declaration(jitctx, Some(enum_word_type));
