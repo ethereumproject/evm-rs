@@ -15,6 +15,7 @@ static BSWAP_I64_INTRINSIC_NAME: &str = "llvm.bswap.i64";
 static BSWAP_I256_INTRINSIC_NAME: &str = "llvm.bswap.i256";
 static BSWAP_I160_INTRINSIC_NAME: &str = "llvm.bswap.i160";
 static CTLZ_I256_INTRINSIC_NAME: &str = "llvm.ctlz.i256";
+static CTLZ_I512_INTRINSIC_NAME: &str = "llvm.ctlz.i512";
 static MEMSET_I32_INTRINSIC_NAME: &str = "llvm.memset.p0i8.i32";
 static MEMSET_I64_INTRINSIC_NAME: &str = "llvm.memset.p0i8.i64";
 
@@ -55,9 +56,13 @@ impl LLVMIntrinsicManager for LLVMIntrinsic {
                 let arg = arg_type.unwrap();
                 assert!(arg.is_int_type());
                 let int_bit_width = arg.into_int_type().get_bit_width();
-                assert!(int_bit_width == 256);
+                assert!(int_bit_width == 256 || int_bit_width == 512);
 
-                CTLZ_I256_INTRINSIC_NAME
+                match int_bit_width {
+                    256 => CTLZ_I256_INTRINSIC_NAME,
+                    512 => CTLZ_I512_INTRINSIC_NAME,
+                    _ => panic!("LLVMIntrinsicManager::to_name: bad integer size for ctlz"),
+                }
             }
 
             LLVMIntrinsic::MemSet => {
@@ -191,9 +196,18 @@ impl LLVMIntrinsicManager for LLVMIntrinsic {
                     ctlz_func_found.unwrap()
                 } else {
                     let llvm_ctx = context.llvm_context();
+                    let int_bit_width = arg_type.unwrap().into_int_type().get_bit_width();
                     let types_instance = context.evm_types();
-                    let ctlz_ret_type = types_instance.get_word_type();
-                    let arg1 = types_instance.get_word_type();
+
+                    let func_type = if int_bit_width == 256 {
+                        types_instance.get_word_type()
+                    }
+                    else {
+                        types_instance.get_extended_word_type()
+                    };
+
+                    let ctlz_ret_type = func_type;
+                    let arg1 = func_type;
                     let arg2 = llvm_ctx.bool_type();
                     let ctlz_func_type = FunctionTypeBuilder::new(llvm_ctx)
                         .returns(ctlz_ret_type)
@@ -471,6 +485,42 @@ mod tests {
         assert_eq!(arg2.get_type().into_int_type().get_bit_width(), 1);
 
         let ret_t = word_type;
+        assert_eq!(func_decl.get_return_type(), BasicTypeEnum::IntType(ret_t));
+        assert!(func_decl.get_linkage() == External);
+
+        let nounwind_attr = func_decl.get_enum_attribute(0, Attribute::get_named_enum_kind_id("nounwind"));
+        assert!(nounwind_attr != None);
+
+        let readnone_attr = func_decl.get_enum_attribute(0, Attribute::get_named_enum_kind_id("readnone"));
+        assert!(readnone_attr != None);
+
+        let speculatable_attr = func_decl.get_enum_attribute(0, Attribute::get_named_enum_kind_id("speculatable"));
+        assert!(speculatable_attr != None);
+    }
+
+    #[test]
+    fn test_intrinsic_ctlz512_decl() {
+        let jitctx = JITContext::new();
+        let types_instance = jitctx.evm_types();
+        let extended_word_type = types_instance.get_extended_word_type();
+        let enum_word_type = BasicTypeEnum::IntType(extended_word_type);
+        let func_decl = LLVMIntrinsic::Ctlz.get_intrinsic_declaration(&jitctx, Some(enum_word_type));
+        assert_eq!(func_decl.count_params(), 2);
+        let func_name = func_decl.get_name();
+        assert_eq!(
+            func_name.to_str(),
+            Ok(LLVMIntrinsic::Ctlz.to_name(Some(enum_word_type)))
+        );
+
+        let arg1 = func_decl.get_nth_param(0).unwrap();
+        assert!(arg1.get_type().is_int_type());
+        assert_eq!(arg1.get_type().into_int_type().get_bit_width(), 512);
+
+        let arg2 = func_decl.get_nth_param(1).unwrap();
+        assert!(arg2.get_type().is_int_type());
+        assert_eq!(arg2.get_type().into_int_type().get_bit_width(), 1);
+
+        let ret_t = extended_word_type;
         assert_eq!(func_decl.get_return_type(), BasicTypeEnum::IntType(ret_t));
         assert!(func_decl.get_linkage() == External);
 

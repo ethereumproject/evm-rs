@@ -20,6 +20,7 @@ pub struct EvmTypes {
     contract_ret_type: IntType,
     address_type: IntType,
     address_ptr_type: PointerType,
+    extended_word_type: IntType,
 }
 
 impl EvmTypes {
@@ -35,6 +36,7 @@ impl EvmTypes {
         let void_t = context.void_type();
         let contract_ret_t = context.i32_type();
         let address_t = context.custom_width_int_type(160);
+        let extended_word_t = context.custom_width_int_type(512);
 
         EvmTypes {
             word_type: word_t,
@@ -49,6 +51,7 @@ impl EvmTypes {
             contract_ret_type: contract_ret_t,
             address_type: address_t,
             address_ptr_type: address_t.ptr_type(AddressSpace::Generic),
+            extended_word_type: extended_word_t
         }
     }
 
@@ -99,47 +102,58 @@ impl EvmTypes {
     pub fn get_address_ptr_type(&self) -> PointerType {
         self.address_ptr_type
     }
+
+    pub fn get_extended_word_type(&self) -> IntType {
+        self.extended_word_type
+    }
 }
 
-#[test]
-fn test_evmtypes() {
-    let context = Context::create();
-    let evm_type_singleton = EvmTypes::new(&context);
-    assert_eq!(evm_type_singleton.get_word_type().get_bit_width(), 256);
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-    let evm_word_ptr = evm_type_singleton.get_word_ptr_type();
-    assert_eq!(evm_word_ptr.get_address_space(), AddressSpace::Generic);
-    assert_eq!(
-        evm_word_ptr.get_element_type().into_int_type(),
-        context.custom_width_int_type(256)
-    );
+    #[test]
+    fn test_evmtypes() {
+        let context = Context::create();
+        let evm_type_singleton = EvmTypes::new(&context);
+        assert_eq!(evm_type_singleton.get_word_type().get_bit_width(), 256);
 
-    assert_eq!(evm_type_singleton.get_bool_type().get_bit_width(), 1);
-    assert_eq!(evm_type_singleton.get_size_type(), context.i64_type());
-    assert_eq!(evm_type_singleton.get_size_type().get_bit_width(), 64);
+        let evm_word_ptr = evm_type_singleton.get_word_ptr_type();
+        assert_eq!(evm_word_ptr.get_address_space(), AddressSpace::Generic);
+        assert_eq!(
+            evm_word_ptr.get_element_type().into_int_type(),
+            context.custom_width_int_type(256)
+        );
 
-    assert_eq!(evm_type_singleton.get_gas_type(), context.i64_type());
-    assert_eq!(evm_type_singleton.get_gas_type().get_bit_width(), 64);
+        assert_eq!(evm_type_singleton.get_extended_word_type().get_bit_width(), 512);
 
-    let evm_gas_ptr_t = evm_type_singleton.get_gas_ptr_type();
-    assert_eq!(evm_gas_ptr_t.get_address_space(), AddressSpace::Generic);
-    assert_eq!(evm_gas_ptr_t.get_element_type().into_int_type(), context.i64_type());
+        assert_eq!(evm_type_singleton.get_bool_type().get_bit_width(), 1);
+        assert_eq!(evm_type_singleton.get_size_type(), context.i64_type());
+        assert_eq!(evm_type_singleton.get_size_type().get_bit_width(), 64);
 
-    assert_eq!(evm_type_singleton.get_byte_type(), context.i8_type());
-    assert_eq!(evm_type_singleton.get_byte_type().get_bit_width(), 8);
+        assert_eq!(evm_type_singleton.get_gas_type(), context.i64_type());
+        assert_eq!(evm_type_singleton.get_gas_type().get_bit_width(), 64);
 
-    let evm_byte_ptr_t = evm_type_singleton.get_byte_ptr_type();
-    assert_eq!(evm_byte_ptr_t.get_address_space(), AddressSpace::Generic);
-    assert_eq!(evm_byte_ptr_t.get_element_type().into_int_type(), context.i8_type());
+        let evm_gas_ptr_t = evm_type_singleton.get_gas_ptr_type();
+        assert_eq!(evm_gas_ptr_t.get_address_space(), AddressSpace::Generic);
+        assert_eq!(evm_gas_ptr_t.get_element_type().into_int_type(), context.i64_type());
 
-    assert_eq!(evm_type_singleton.get_void_type(), context.void_type());
-    assert_eq!(evm_type_singleton.get_void_type().is_sized(), false);
+        assert_eq!(evm_type_singleton.get_byte_type(), context.i8_type());
+        assert_eq!(evm_type_singleton.get_byte_type().get_bit_width(), 8);
 
-    assert_eq!(evm_type_singleton.get_contract_return_type(), context.i32_type());
+        let evm_byte_ptr_t = evm_type_singleton.get_byte_ptr_type();
+        assert_eq!(evm_byte_ptr_t.get_address_space(), AddressSpace::Generic);
+        assert_eq!(evm_byte_ptr_t.get_element_type().into_int_type(), context.i8_type());
 
-    assert_eq!(evm_type_singleton.get_address_type().get_bit_width(), 160);
+        assert_eq!(evm_type_singleton.get_void_type(), context.void_type());
+        assert_eq!(evm_type_singleton.get_void_type().is_sized(), false);
 
-    let evm_address_ptr = evm_type_singleton.get_address_ptr_type();
-    assert_eq!(evm_address_ptr.get_address_space(), AddressSpace::Generic);
-    assert_eq!(evm_address_ptr.get_element_type().into_int_type().get_bit_width(), 160);
+        assert_eq!(evm_type_singleton.get_contract_return_type(), context.i32_type());
+
+        assert_eq!(evm_type_singleton.get_address_type().get_bit_width(), 160);
+
+        let evm_address_ptr = evm_type_singleton.get_address_ptr_type();
+        assert_eq!(evm_address_ptr.get_address_space(), AddressSpace::Generic);
+        assert_eq!(evm_address_ptr.get_element_type().into_int_type().get_bit_width(), 160);
+    }
 }
