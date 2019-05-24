@@ -10,7 +10,6 @@ use super::JITContext;
 pub fn byte_order_swap(context: &JITContext, builder: &Builder, value: IntValue) -> IntValue {
     // Swap byte order if the host system is little endian
     if cfg!(target_endian = "little") {
-        // if byteorder::NativeEndian == byteorder::LE {
         // TODO add support for byte swapping constants at compile time
         // Current problem is that the LLVM API does not expose the APInt class
         // which allows access to the underlying integer value type
