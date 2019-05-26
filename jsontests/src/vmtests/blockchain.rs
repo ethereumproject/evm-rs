@@ -10,7 +10,7 @@ use std::collections::HashMap;
 use std::rc::Rc;
 use std::str::FromStr;
 
-use crate::read_u256;
+use super::read_u256;
 
 pub struct JSONBlock {
     codes: HashMap<Address, Vec<u8>>,

@@ -1,7 +1,7 @@
 #![allow(non_snake_case)]
 
 use evm::VMTestPatch;
-use jsontests::test_transaction;
+use jsontests::vmtests::test_transaction;
 use serde_json::Value;
 
 // Log format is broken for input limits tests
