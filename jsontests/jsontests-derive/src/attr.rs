@@ -5,6 +5,18 @@ use syn::Ident;
 use syn::Lit::Str;
 use syn::MetaItem;
 
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub enum Runtime {
+    Static,
+    Dynamic,
+}
+
+impl Default for Runtime {
+    fn default() -> Self {
+        Runtime::Dynamic
+    }
+}
+
 #[derive(Default)]
 pub struct Config {
     pub directory: String,
@@ -12,6 +24,7 @@ pub struct Config {
     pub bench_with: Option<ExternalRef>,
     pub criterion_config: Option<ExternalRef>,
     pub patch: Option<ExternalRef>,
+    pub runtime: Runtime,
     pub skip: bool,
     pub should_panic: bool,
 }
@@ -46,15 +59,12 @@ pub fn extract_attrs(ast: &syn::DeriveInput) -> Result<Config, Error> {
                              #[derive(JsonTests)]\n\
                              #[directory = \"../tests/testset\"]\n\
                              #[test_with = \"test::test_function\"]\n\
+                             #[runtime = \"static|dynamic\"] (Optional, default = dynamic)\n\
                              #[bench_wuth = \"test::bench_function\"] (Optional)\n\
                              #[patch = \"CustomTestPatch\" (Optional)\n\
                              #[skip] (Optional)\n\
                              #[should_panic] (Optional)\n\
                              struct TestSet;";
-
-    if ast.attrs.len() < 2 || ast.attrs.len() > 6 {
-        return Err(failure::err_msg(ERROR_MSG));
-    }
 
     let config = ast
         .attrs
@@ -79,6 +89,14 @@ pub fn extract_attrs(ast: &syn::DeriveInput) -> Result<Config, Error> {
                 },
                 "patch" => Config {
                     patch: Some(ExternalRef::from(value.clone())),
+                    ..config
+                },
+                "runtime" => Config {
+                    runtime: match value.as_ref() {
+                        "static" => Runtime::Static,
+                        "dynamic" => Runtime::Dynamic,
+                        _ => panic!("{}", ERROR_MSG),
+                    },
                     ..config
                 },
                 _ => panic!("{}", ERROR_MSG),

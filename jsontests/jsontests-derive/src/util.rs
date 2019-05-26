@@ -1,31 +1,27 @@
 use quote;
+use std::path::Path;
 use syn::Ident;
 
 use crate::attr::Config;
+use std::ffi::OsStr;
 
-pub fn open_directory_module(config: &Config, tokens: &mut quote::Tokens) -> String {
-    // get the leaf directory name
-    let dirname = config.directory.rsplit('/').next().unwrap();
-
+pub fn open_directory_module(dirname: &str, tokens: &mut quote::Tokens) {
     // create identifier
     let dirname = sanitize_ident(dirname);
     let dirname_ident = Ident::from(dirname.as_ref());
 
     open_module(dirname_ident, tokens);
-
-    dirname
 }
 
-pub fn open_file_module(filepath: &str, tokens: &mut quote::Tokens) -> String {
+pub fn open_file_module(filepath: impl AsRef<Path>, tokens: &mut quote::Tokens) {
+    let filepath = filepath.as_ref();
     // get file name without extension
-    let filename = filepath.rsplit('/').next().unwrap().split('.').next().unwrap();
+    let filename = filepath.file_stem().and_then(OsStr::to_str).unwrap();
     // create identifier
     let filename = sanitize_ident(filename);
     let filename_ident = Ident::from(filename.as_ref());
 
     open_module(filename_ident, tokens);
-
-    filename
 }
 
 pub fn open_module<I: Into<Ident>>(module_name: I, tokens: &mut quote::Tokens) {
@@ -57,13 +53,32 @@ pub fn sanitize_ident(ident: &str) -> String {
     };
 
     // replace special characters with _
-    replace_chars(&ident, "!@#$%^&*-+=/<>;\'\"()`~", "_")
+    escape_as_underscore(&ident, "!@#$%^&*-+=/<>;\'\"()`~")
 }
 
-pub fn replace_chars(s: &str, from: &str, to: &str) -> String {
+use std::cell::{Cell, RefCell};
+use std::collections::HashMap;
+
+thread_local! {
+    static UNDERSCORE_ENCODING_MAP: RefCell<HashMap<char, u8>> = RefCell::new(HashMap::new());
+    static UNDERSCORE_ENCODING_MAX: Cell<u8> = Cell::new(0);
+}
+
+fn escape_as_underscore(s: &str, from: &str) -> String {
     let mut initial = s.to_owned();
     for c in from.chars() {
-        initial = initial.replace(c, to);
+        let replacement: String = UNDERSCORE_ENCODING_MAP.with(|map| {
+            let mut map = map.borrow_mut();
+            let cnt = map.entry(c).or_insert_with(|| {
+                UNDERSCORE_ENCODING_MAX.with(|max| {
+                    let cnt = max.get() + 1;
+                    max.set(cnt);
+                    cnt
+                })
+            });
+            std::iter::repeat('_').take(*cnt as usize).collect()
+        });
+        initial = initial.replace(c, &replacement);
     }
     initial
 }
