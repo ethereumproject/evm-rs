@@ -1,9 +1,33 @@
+use std::cell::RefCell;
+
 use evmjit::compiler::evmtypes::EvmTypes;
+use evmjit::compiler::external_declarations::DeclarationManager;
 use evmjit::compiler::runtime::env::EnvDataType;
 use evmjit::compiler::util::funcbuilder::*;
 
+use super::JITContext;
+
 use inkwell::context::Context;
+use inkwell::module::Linkage::*;
 use inkwell::types::FunctionType;
+use inkwell::values::FunctionValue;
+
+/// Manager of all declarations for functions which provide EVM functionality.
+pub struct CallbackDeclarationManager<'a> {
+    m_context: &'a JITContext,
+    m_storageload: RefCell<Option<FunctionValue>>,
+    m_storagestore: RefCell<Option<FunctionValue>>,
+    m_balance: RefCell<Option<FunctionValue>>,
+    m_calldataload: RefCell<Option<FunctionValue>>,
+    m_create: RefCell<Option<FunctionValue>>,
+    m_blockhash: RefCell<Option<FunctionValue>>,
+    m_sha3: RefCell<Option<FunctionValue>>,
+    m_extcodesize: RefCell<Option<FunctionValue>>,
+    m_extcodecopy: RefCell<Option<FunctionValue>>,
+    m_log: RefCell<Option<FunctionValue>>,
+    m_selfdestruct: RefCell<Option<FunctionValue>>,
+    m_call: RefCell<Option<FunctionValue>>,
+}
 
 /// CallbackTypes provides function signatures for each callback function provided to the JIT.
 #[derive(Debug)]
@@ -28,8 +52,282 @@ pub struct CallbackTypes {
     m_call: FunctionType,
 }
 
-unsafe impl Sync for CallbackTypes {}
-unsafe impl Send for CallbackTypes {}
+impl<'a> DeclarationManager<'a> for CallbackDeclarationManager<'a> {
+    fn new(context: &'a JITContext) -> Self {
+        CallbackDeclarationManager {
+            m_context: context,
+            m_storageload: RefCell::new(None),
+            m_storagestore: RefCell::new(None),
+            m_balance: RefCell::new(None),
+            m_calldataload: RefCell::new(None),
+            m_create: RefCell::new(None),
+            m_blockhash: RefCell::new(None),
+            m_sha3: RefCell::new(None),
+            m_extcodesize: RefCell::new(None),
+            m_extcodecopy: RefCell::new(None),
+            m_log: RefCell::new(None),
+            m_selfdestruct: RefCell::new(None),
+            m_call: RefCell::new(None),
+        }
+    }
+
+    fn get_decl(&self, name: &str) -> FunctionValue {
+        // TODO: reduce code duplication here
+        // TODO: verify runtime borrowing here
+        match name {
+            // If we have already declared the function, return the stored reference. Otherwise,
+            // initialize, store the reference, and return it.
+            "evm.storageload" => {
+                if let Some(decl) = *self.m_storageload.borrow() {
+                    decl.clone()
+                } else {
+                    // Explicitly clone here so that we can move decl inside the optional, and return its
+                    // copy to the user.
+                    let decl = self.init_storageload();
+                    let ret = decl.clone();
+
+                    *self.m_storageload.borrow_mut() = Some(decl);
+                    ret
+                }
+            }
+            "evm.storagestore" => {
+                if let Some(decl) = *self.m_storagestore.borrow() {
+                    decl.clone()
+                } else {
+                    // Explicitly clone here so that we can move decl inside the optional, and return its
+                    // copy to the user.
+                    let decl = self.init_storagestore();
+                    let ret = decl.clone();
+
+                    *self.m_storagestore.borrow_mut() = Some(decl);
+                    ret
+                }
+            }
+            "evm.balance" => {
+                if let Some(decl) = *self.m_balance.borrow() {
+                    decl.clone()
+                } else {
+                    // Explicitly clone here so that we can move decl inside the optional, and return its
+                    // copy to the user.
+                    let decl = self.init_balance();
+                    let ret = decl.clone();
+
+                    *self.m_balance.borrow_mut() = Some(decl);
+                    ret
+                }
+            }
+            "evm.calldataload" => {
+                if let Some(decl) = *self.m_calldataload.borrow() {
+                    decl.clone()
+                } else {
+                    // Explicitly clone here so that we can move decl inside the optional, and return its
+                    // copy to the user.
+                    let decl = self.init_calldataload();
+                    let ret = decl.clone();
+
+                    *self.m_calldataload.borrow_mut() = Some(decl);
+                    ret
+                }
+            }
+            "evm.create" => {
+                if let Some(decl) = *self.m_create.borrow() {
+                    decl.clone()
+                } else {
+                    // Explicitly clone here so that we can move decl inside the optional, and return its
+                    // copy to the user.
+                    let decl = self.init_create();
+                    let ret = decl.clone();
+
+                    *self.m_create.borrow_mut() = Some(decl);
+                    ret
+                }
+            }
+            "evm.blockhash" => {
+                if let Some(decl) = *self.m_blockhash.borrow() {
+                    decl.clone()
+                } else {
+                    // Explicitly clone here so that we can move decl inside the optional, and return its
+                    // copy to the user.
+                    let decl = self.init_blockhash();
+                    let ret = decl.clone();
+
+                    *self.m_blockhash.borrow_mut() = Some(decl);
+                    ret
+                }
+            }
+            "evm.sha3" => {
+                if let Some(decl) = *self.m_sha3.borrow() {
+                    decl.clone()
+                } else {
+                    // Explicitly clone here so that we can move decl inside the optional, and return its
+                    // copy to the user.
+                    let decl = self.init_sha3();
+                    let ret = decl.clone();
+
+                    *self.m_sha3.borrow_mut() = Some(decl);
+                    ret
+                }
+            }
+            "evm.extcodesize" => {
+                if let Some(decl) = *self.m_extcodesize.borrow() {
+                    decl.clone()
+                } else {
+                    // Explicitly clone here so that we can move decl inside the optional, and return its
+                    // copy to the user.
+                    let decl = self.init_extcodesize();
+                    let ret = decl.clone();
+
+                    *self.m_extcodesize.borrow_mut() = Some(decl);
+                    ret
+                }
+            }
+            "evm.extcodecopy" => {
+                if let Some(decl) = *self.m_extcodecopy.borrow() {
+                    decl.clone()
+                } else {
+                    // Explicitly clone here so that we can move decl inside the optional, and return its
+                    // copy to the user.
+                    let decl = self.init_extcodecopy();
+                    let ret = decl.clone();
+
+                    *self.m_extcodecopy.borrow_mut() = Some(decl);
+                    ret
+                }
+            }
+            "evm.log" => {
+                if let Some(decl) = *self.m_log.borrow() {
+                    decl.clone()
+                } else {
+                    // Explicitly clone here so that we can move decl inside the optional, and return its
+                    // copy to the user.
+                    let decl = self.init_log();
+                    let ret = decl.clone();
+
+                    *self.m_log.borrow_mut() = Some(decl);
+                    ret
+                }
+            }
+            "evm.selfdestruct" => {
+                if let Some(decl) = *self.m_selfdestruct.borrow() {
+                    decl.clone()
+                } else {
+                    // Explicitly clone here so that we can move decl inside the optional, and return its
+                    // copy to the user.
+                    let decl = self.init_selfdestruct();
+                    let ret = decl.clone();
+
+                    *self.m_selfdestruct.borrow_mut() = Some(decl);
+                    ret
+                }
+            }
+            "evm.call" => {
+                if let Some(decl) = *self.m_call.borrow() {
+                    decl.clone()
+                } else {
+                    // Explicitly clone here so that we can move decl inside the optional, and return its
+                    // copy to the user.
+                    let decl = self.init_call();
+                    let ret = decl.clone();
+
+                    *self.m_call.borrow_mut() = Some(decl);
+                    ret
+                }
+            }
+            _ => panic!(format!(
+                "Callback declaration manager was requested an invalid import: {}",
+                name
+            )),
+        }
+    }
+}
+
+// TODO: Reduce code duplication
+// TODO: Add attributes to init methods after interface is decided.
+impl<'a> CallbackDeclarationManager<'a> {
+    fn init_storageload(&self) -> FunctionValue {
+        let module = self.m_context.module();
+        let sig = self.m_context.callback_types().get_type_sload();
+        let decl = module.add_function("evm.storageload", sig, Some(External));
+        decl
+    }
+
+    fn init_storagestore(&self) -> FunctionValue {
+        let module = self.m_context.module();
+        let sig = self.m_context.callback_types().get_type_sstore();
+        let decl = module.add_function("evm.storagestore", sig, Some(External));
+        decl
+    }
+
+    fn init_balance(&self) -> FunctionValue {
+        let module = self.m_context.module();
+        let sig = self.m_context.callback_types().get_type_balance();
+        let decl = module.add_function("evm.balance", sig, Some(External));
+        decl
+    }
+
+    fn init_calldataload(&self) -> FunctionValue {
+        let module = self.m_context.module();
+        let sig = self.m_context.callback_types().get_type_calldataload();
+        let decl = module.add_function("evm.calldataload", sig, Some(External));
+        decl
+    }
+
+    fn init_create(&self) -> FunctionValue {
+        let module = self.m_context.module();
+        let sig = self.m_context.callback_types().get_type_create();
+        let decl = module.add_function("evm.create", sig, Some(External));
+        decl
+    }
+
+    fn init_blockhash(&self) -> FunctionValue {
+        let module = self.m_context.module();
+        let sig = self.m_context.callback_types().get_type_blockhash();
+        let decl = module.add_function("evm.blockhash", sig, Some(External));
+        decl
+    }
+
+    fn init_sha3(&self) -> FunctionValue {
+        let module = self.m_context.module();
+        let sig = self.m_context.callback_types().get_type_sha3();
+        let decl = module.add_function("evm.sha3", sig, Some(External));
+        decl
+    }
+
+    fn init_extcodesize(&self) -> FunctionValue {
+        let module = self.m_context.module();
+        let sig = self.m_context.callback_types().get_type_extcodesize();
+        let decl = module.add_function("evm.extcodesize", sig, Some(External));
+        decl
+    }
+
+    fn init_extcodecopy(&self) -> FunctionValue {
+        let module = self.m_context.module();
+        let sig = self.m_context.callback_types().get_type_extcodecopy();
+        let decl = module.add_function("evm.extcodecopy", sig, Some(External));
+        decl
+    }
+
+    fn init_log(&self) -> FunctionValue {
+        let module = self.m_context.module();
+        let sig = self.m_context.callback_types().get_type_log();
+        let decl = module.add_function("evm.log", sig, Some(External));
+        decl
+    }
+
+    fn init_selfdestruct(&self) -> FunctionValue {
+        let module = self.m_context.module();
+        let sig = self.m_context.callback_types().get_type_selfdestruct();
+        let decl = module.add_function("evm.selfdestruct", sig, Some(External));
+        decl
+    }
+
+    fn init_call(&self) -> FunctionValue {
+        let module = self.m_context.module();
+        let sig = self.m_context.callback_types().get_type_call();
+        let decl = module.add_function("evm.call", sig, Some(External));
+        decl
+    }
+}
 
 macro_rules! get_type_impl {
     ($method_name:ident, $member: ident) => {
@@ -57,6 +355,7 @@ impl CallbackTypes {
 impl CallbackTypes {
     pub fn new(context: &Context, evm: &EvmTypes, env: &EnvDataType) -> Self {
         // TODO: double check these signatures
+        // TODO: agree on how the code should access its own context when calling back into SVM.
         CallbackTypes {
             m_storageload: FunctionTypeBuilder::new(context)
                 .arg(env.get_ptr_type())
