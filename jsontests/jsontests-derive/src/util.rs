@@ -28,7 +28,7 @@ pub fn open_module<I: Into<Ident>>(module_name: I, tokens: &mut quote::Tokens) {
     let module_name = module_name.into();
     // append module opening tokens
     tokens.append(quote! {
-        mod #module_name
+        pub(crate) mod #module_name
     });
     tokens.append("{");
 }
@@ -58,9 +58,12 @@ pub fn sanitize_ident(ident: &str) -> String {
 
 use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
+use std::time::Instant;
 
 thread_local! {
-    static UNDERSCORE_ENCODING_MAP: RefCell<HashMap<char, u8>> = RefCell::new(HashMap::new());
+    static UNDERSCORE_ENCODING_MAP: RefCell<HashMap<char, u8>> = RefCell::new(
+        [('-', 1), ('_', 2)].iter().cloned().collect()
+    );
     static UNDERSCORE_ENCODING_MAX: Cell<u8> = Cell::new(0);
 }
 
@@ -81,4 +84,30 @@ fn escape_as_underscore(s: &str, from: &str) -> String {
         initial = initial.replace(c, &replacement);
     }
     initial
+}
+
+pub struct Timer<'a> {
+    msg: &'a str,
+    start: Instant,
+}
+
+impl<'a> Timer<'a> {
+    pub fn new(msg: &'a str) -> Self {
+        use std::io::Write;
+        eprintln!("[start] {}", msg);
+        Timer {
+            msg,
+            start: Instant::now(),
+        }
+    }
+}
+
+impl<'a> Drop for Timer<'a> {
+    fn drop(&mut self) {
+        let elapsed = self.start.elapsed();
+        let elapsed_secs = elapsed.as_secs();
+        let elapsed_millis = elapsed.subsec_millis();
+        let elapsed_secs_float = (elapsed_secs as f64) + (elapsed_millis as f64) / 1000.0;
+        eprintln!("[{:.3}] {} finished", elapsed_secs_float, self.msg);
+    }
 }

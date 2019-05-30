@@ -1,77 +1,62 @@
-#![cfg_attr(feature = "bench", feature(test))]
 #![allow(non_snake_case)]
 #![allow(unused)]
 
 #[macro_use]
 extern crate jsontests_derive;
 
-#[cfg(feature = "bench")]
-extern crate test;
-
 #[derive(JsonTests)]
 #[directory = "jsontests/res/files/eth/VMTests/vmArithmeticTest"]
 #[test_with = "jsontests::vmtests::run_test"]
-#[cfg_attr(feature = "bench", bench_with = "jsontests::vmtests::run_bench")]
 struct Arithmetic;
 
 #[derive(JsonTests)]
 #[directory = "jsontests/res/files/eth/VMTests/vmBitwiseLogicOperation"]
 #[test_with = "jsontests::vmtests::run_test"]
-#[cfg_attr(feature = "bench", bench_with = "jsontests::vmtests::run_bench")]
 struct BitwiseLogicOperation;
 
 #[derive(JsonTests)]
 #[directory = "jsontests/res/files/eth/VMTests/vmBlockInfoTest"]
 #[test_with = "jsontests::vmtests::run_test"]
-#[cfg_attr(feature = "bench", bench_with = "jsontests::vmtests::run_bench")]
 struct BlockInfo;
 
 #[derive(JsonTests)]
 #[directory = "jsontests/res/files/eth/VMTests/vmEnvironmentalInfo"]
 #[test_with = "jsontests::vmtests::run_test"]
-#[cfg_attr(feature = "bench", bench_with = "jsontests::vmtests::run_bench")]
 struct VmInverontemtalInfo;
 
 #[derive(JsonTests)]
 #[directory = "jsontests/res/files/eth/VMTests/vmIOandFlowOperations"]
 #[test_with = "jsontests::vmtests::run_test"]
-#[cfg_attr(feature = "bench", bench_with = "jsontests::vmtests::run_bench")]
 struct VmIOandFlowOperations;
 
 #[derive(JsonTests)]
 #[directory = "jsontests/res/files/eth/VMTests/vmLogTest"]
 #[test_with = "jsontests::vmtests::run_test"]
-#[cfg_attr(feature = "bench", bench_with = "jsontests::vmtests::run_bench")]
 struct Log;
 
 #[derive(JsonTests)]
 #[directory = "jsontests/res/files/eth/VMTests/vmPushDupSwapTest"]
 #[test_with = "jsontests::vmtests::run_test"]
-#[cfg_attr(feature = "bench", bench_with = "jsontests::vmtests::run_bench")]
 struct PushDupSwap;
 
 #[derive(JsonTests)]
 #[directory = "jsontests/res/files/eth/VMTests/vmRandomTest"]
 #[test_with = "jsontests::vmtests::run_test"]
-#[cfg_attr(feature = "bench", bench_with = "jsontests::vmtests::run_bench")]
 struct Random;
 
 #[derive(JsonTests)]
 #[directory = "jsontests/res/files/eth/VMTests/vmSha3Test"]
 #[test_with = "jsontests::vmtests::run_test"]
-#[cfg_attr(feature = "bench", bench_with = "jsontests::vmtests::run_bench")]
 struct Sha3;
 
 #[derive(JsonTests)]
 #[directory = "jsontests/res/files/eth/VMTests/vmSystemOperations"]
 #[test_with = "jsontests::vmtests::run_test"]
-#[cfg_attr(feature = "bench", bench_with = "jsontests::vmtests::run_bench")]
 struct SystemOperations;
 
 #[derive(JsonTests)]
 #[directory = "jsontests/res/files/eth/VMTests/vmTests"]
 #[test_with = "jsontests::vmtests::run_test"]
-#[cfg_attr(feature = "bench", bench_with = "jsontests::vmtests::run_bench")]
 struct VM;
 
 use bigint::{Address, Gas};
@@ -81,21 +66,18 @@ use evm::{EmbeddedAccountPatch, Patch, Precompiled, EMBEDDED_PRECOMPILEDS};
 #[derive(JsonTests)]
 #[directory = "jsontests/res/files/eth/VMTests/vmEIP215"]
 #[test_with = "jsontests::vmtests::run_test"]
-#[cfg_attr(feature = "bench", bench_with = "jsontests::vmtests::run_bench")]
 struct EIP215;
 
 // EXTCODEHASH tests
 #[derive(JsonTests)]
 #[directory = "jsontests/res/files/eth/VMTests/vmEIP1052"]
 #[test_with = "jsontests::vmtests::run_test"]
-#[cfg_attr(feature = "bench", bench_with = "jsontests::vmtests::run_bench")]
 struct EIP1052;
 
 // CREATE2 tests
 #[derive(JsonTests)]
 #[directory = "jsontests/res/files/eth/VMTests/vmEIP1014"]
 #[test_with = "jsontests::vmtests::run_test"]
-#[cfg_attr(feature = "bench", bench_with = "jsontests::vmtests::run_bench")]
 struct EIP1014;
 
 // Gas metering changes tests
@@ -103,7 +85,6 @@ struct EIP1014;
 #[directory = "jsontests/res/files/eth/VMTests/vmEIP1283"]
 #[test_with = "jsontests::vmtests::run_test"]
 #[patch = "crate::EIP1283Patch"]
-#[cfg_attr(feature = "bench", bench_with = "jsontests::vmtests::run_bench")]
 struct EIP1283;
 
 #[derive(Copy, Clone, Default)]

@@ -38,7 +38,7 @@ use criterion::Criterion;
 
 pub fn run_bench_from_file<F>(c: &mut Criterion, path: impl AsRef<Path>, bench_fn: F)
 where
-    F: Fn(&mut Criterion, &str, &str),
+    F: Fn(&mut Criterion, &str, &str) + 'static,
 {
     let tests = load_tests(path);
     for (name, test) in tests {

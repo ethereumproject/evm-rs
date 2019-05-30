@@ -22,9 +22,5 @@ ethereum-rlp = { version = "0.2", default-features = false }
 criterion = "0.2.5"
 failure = "0.1.5"
 
-[features]
-default = []
-bench = []
-
 [target.'cfg(unix)'.dependencies]
 gag = "0.1.10"

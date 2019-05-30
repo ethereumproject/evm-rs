@@ -48,8 +48,6 @@ pub fn json_tests(input: TokenStream) -> TokenStream {
         Err(err) => panic!("{}", err),
     };
 
-    println!("{}", gen.to_string());
-
     // Return the generated impl
     gen.parse().unwrap()
 }
@@ -58,12 +56,12 @@ fn impl_json_tests(ast: &syn::DeriveInput) -> Result<quote::Tokens, Error> {
     let config = extract_attrs(&ast)?;
     let tests = read_tests_from_dir(&config, &config.directory)?;
     let mut tokens = quote::Tokens::new();
-    let mut bench_idents = Vec::new();
+    let struct_ident = &ast.ident;
 
     // If behchmarking support is requested, import Criterion
     if config.bench_with.is_some() {
         tokens.append(quote! {
-            use criterion::Criterion;
+            use criterion::Criterion as _;
         })
     }
 
@@ -71,13 +69,14 @@ fn impl_json_tests(ast: &syn::DeriveInput) -> Result<quote::Tokens, Error> {
         config: &config,
         tokens,
         bench_idents: Vec::new(),
+        modules: Vec::new(),
     };
 
     tests.traverse(&mut ast_runner);
 
     let mut tokens = ast_runner.tokens;
 
-    generate_criterion_macros(&config, &bench_idents, &mut tokens);
+    generate_criterion_macros(&config, &struct_ident, &ast_runner.bench_idents, &mut tokens);
 
     Ok(tokens)
 }
@@ -85,42 +84,51 @@ fn impl_json_tests(ast: &syn::DeriveInput) -> Result<quote::Tokens, Error> {
 struct AstRunner<'a> {
     config: &'a Config,
     tokens: quote::Tokens,
+    modules: Vec<String>,
     bench_idents: Vec<Ident>,
 }
 
+impl AstRunner<'_> {
+    fn push_module(&mut self, name: String) {
+        let mod_name = sanitize_ident(&name);
+        self.modules.push(mod_name.clone());
+        open_module(mod_name, &mut self.tokens);
+    }
+
+    fn pop_module(&mut self) {
+        self.modules.pop();
+        close_brace(&mut self.tokens)
+    }
+}
+
 impl TestASTRunner for AstRunner<'_> {
-    fn handle_open_module(&mut self, name: String, nodes: &[TestAST]) {
-        open_module(sanitize_ident(&name), &mut self.tokens);
-    }
-
-    fn handle_close_module(&mut self) {
-        close_brace(&mut self.tokens)
-    }
-
-    fn handle_open_test_file(&mut self, name: String, nodes: &[TestAST]) {
-        open_module(sanitize_ident(&name), &mut self.tokens)
-    }
-
-    fn handle_close_test_file(&mut self) {
-        close_brace(&mut self.tokens)
-    }
-
     fn handle_test(&mut self, test: Test) {
         let data = test.data.map(|d| json::to_string(&d).unwrap());
         let name = sanitize_ident(&test.name);
         let name_ident = Ident::from(name.as_ref());
         generate_test(&self.config, &test.path, &name_ident, &data, &mut self.tokens);
-        /*
-        generate_bench(&config, &name_ident, &data, &mut tokens).map(|mut ident| {
-            // prepend dir submodule
-            ident = Ident::from(format!("{}::{}", dir_mod_name, ident.as_ref()));
-            // prepend file submodule
-            if need_file_submodule {
-                ident = Ident::from(format!("{}::{}", file_mod_name.as_ref().unwrap(), ident.as_ref()));
-            }
-            bench_idents.push(ident);
+        generate_bench(&self.config, &test.path, &name_ident, &data, &mut self.tokens).map(|mut ident| {
+            // prepare sumbodule path
+            let modules_chain = self.modules.join("::");
+            let bench_ident = format!("{}::{}", modules_chain, ident);
+            self.bench_idents.push(bench_ident.into());
         });
-        */
+    }
+
+    fn handle_open_module(&mut self, name: String, _nodes: &[TestAST]) {
+        self.push_module(name);
+    }
+
+    fn handle_close_module(&mut self) {
+        self.pop_module()
+    }
+
+    fn handle_open_test_file(&mut self, name: String, _nodes: &[TestAST]) {
+        self.push_module(name);
+    }
+
+    fn handle_close_test_file(&mut self) {
+        self.pop_module()
     }
 }
 
@@ -145,7 +153,7 @@ fn generate_test(
         Runtime::Static => {
             let data = data.as_ref().unwrap();
             tokens.append(quote! {
-                fn #test_name() {
+                pub(crate) fn #test_name() {
                     use #test_func_path;
                     use #patch_path;
                     let data = #data;
@@ -156,7 +164,7 @@ fn generate_test(
         Runtime::Dynamic => {
             let path = path.as_ref().to_str().unwrap();
             tokens.append(quote! {
-                fn #test_name() {
+                pub(crate) fn #test_name() {
                     use #test_func_path;
                     use #patch_path;
                     jsontests::run_tests_from_file(#path, #test_func_name::<#patch_name>)
@@ -166,7 +174,13 @@ fn generate_test(
     }
 }
 
-fn generate_bench(config: &Config, test_name: &Ident, data: &str, tokens: &mut quote::Tokens) -> Option<Ident> {
+fn generate_bench(
+    config: &Config,
+    path: impl AsRef<Path>,
+    test_name: &Ident,
+    data: &Option<String>,
+    tokens: &mut quote::Tokens,
+) -> Option<Ident> {
     if config.bench_with.is_none() {
         return None;
     }
@@ -180,19 +194,36 @@ fn generate_bench(config: &Config, test_name: &Ident, data: &str, tokens: &mut q
 
     let (patch_name, patch_path) = derive_patch(config);
 
-    tokens.append(quote! {
-        pub fn #bench_ident(c: &mut Criterion) {
-            use #bench_func_path;
-            use #patch_path;
-            let data = #data;
-            #bench_func_name::<#patch_name>(c, #bench_name, data);
+    match config.runtime {
+        Runtime::Static => {
+            let data = data.as_ref().unwrap();
+            tokens.append(quote! {
+                pub(crate) fn #bench_ident(c: &mut criterion::Criterion) {
+                    use #bench_func_path;
+                    use #patch_path;
+                    let data = #data;
+                    #bench_func_name::<#patch_name>(c, #bench_name, data);
+                }
+            });
         }
-    });
+        Runtime::Dynamic => {
+            let path = path.as_ref().to_str().unwrap();
+            tokens.append(quote! {
+                pub(crate) fn #bench_ident(c: &mut criterion::Criterion) {
+                    use #bench_func_path;
+                    use #patch_path;
+                    jsontests::run_bench_from_file(c, #path, #bench_func_name::<#patch_name>)
+                }
+            });
+        }
+    }
 
     Some(bench_ident)
 }
 
-fn generate_criterion_macros(config: &Config, benches: &[Ident], tokens: &mut quote::Tokens) {
+fn generate_criterion_macros(config: &Config, group_name: &Ident, benches: &[Ident], tokens: &mut quote::Tokens) {
+    let group_name = format!("{}_bench_main", group_name);
+    let group_name = Ident::from(sanitize_ident(&group_name));
     // Generate criterion macros
     if config.bench_with.is_some() {
         let benches = benches.iter().map(AsRef::as_ref).join(" , ");
@@ -200,13 +231,13 @@ fn generate_criterion_macros(config: &Config, benches: &[Ident], tokens: &mut qu
             .criterion_config
             .as_ref()
             .map(|cfg| cfg.path.clone())
-            .unwrap_or_else(|| Ident::from("Criterion::default"));
+            .unwrap_or_else(|| Ident::from("criterion::Criterion::default"));
         let template = quote! {
             criterion_group! {
-                name = main;
+                name = #group_name;
                 config = #config();
                 targets = TARGETS
-            };
+            }
         };
         tokens.append(template.as_ref().replace("TARGETS", &benches));
     }
