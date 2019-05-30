@@ -48,28 +48,40 @@ pub trait TestASTRunner {
     fn handle_close_test_file(&mut self);
 }
 
+use crate::util::Timer;
+use rayon::prelude::*;
+use std::io::Write;
+use std::time::Instant;
+
 pub fn read_tests_from_dir<P: AsRef<Path>>(config: &Config, dir_path: P) -> Result<TestAST, Error> {
+    let timer_msg = format!("reading tests from {}", dir_path.as_ref().display());
+    let timer = Timer::new(&timer_msg);
     read_module(config, dir_path)
 }
 
 fn read_dir_and_emit_nodes(config: &Config, path: impl AsRef<Path>) -> Result<Vec<TestAST>, Error> {
-    let mut nodes = Vec::new();
+    use std::convert::identity;
 
-    for entry in fs::read_dir(path)? {
-        let entry = entry?;
-        let filetype = entry.file_type()?;
-        if filetype.is_dir() {
-            nodes.push(read_module(config, entry.path())?);
-        } else if filetype.is_file() {
-            if let Some(node) = read_tests_file(config, entry.path())? {
-                nodes.push(node)
+    // For every directory entry, running in parallel
+    fs::read_dir(path)?.par_bridge()
+        .map(|entry| -> Result<Option<TestAST>, Error> {
+            let entry = entry?;
+            let filetype = entry.file_type()?;
+            if filetype.is_dir() {
+                Ok(Some(read_module(config, entry.path())?))
+            } else if filetype.is_file() {
+                Ok(read_tests_file(config, entry.path())?)
+            } else {
+                println!("ommitting symlink {}", entry.path().display());
+                Ok(None)
             }
-        } else {
-            println!("ommitting symlink {}", entry.path().display());
-        }
-    }
-
-    Ok(nodes)
+        })
+        // Turn Result<Option<T>, E> into Option<Result<T, E>>
+        .map(Result::transpose)
+        // Remove all Nones (skipped symlinks)
+        .filter_map(identity)
+        // Collect Iter<Result<T, E>> into Result<Vec<T>, E>
+        .collect()
 }
 
 fn read_module(config: &Config, path: impl AsRef<Path>) -> Result<TestAST, Error> {
@@ -94,11 +106,10 @@ fn read_tests_file(config: &Config, path: impl AsRef<Path>) -> Result<Option<Tes
     assert!(path.as_ref().is_file());
 
     let path = path.as_ref().canonicalize()?.to_owned();
-    eprintln!("reading file {}", path.display());
 
     let name = path
         .file_stem()
-        .ok_or(failure::err_msg("couldn't read file stem"))?
+        .ok_or_else(|| failure::err_msg("couldn't read file stem"))?
         .to_str()
         .map(ToOwned::to_owned)
         .ok_or_else(|| failure::err_msg("path is not a valid utf-8"))?;

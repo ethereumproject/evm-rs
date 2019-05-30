@@ -36,6 +36,8 @@ use std::path::Path;
     )
 )]
 pub fn json_tests(input: TokenStream) -> TokenStream {
+    let timer = Timer::new("JsonTests proc-macro");
+
     // Construct a string representation of the type definition
     let s = input.to_string();
 
@@ -72,7 +74,9 @@ fn impl_json_tests(ast: &syn::DeriveInput) -> Result<quote::Tokens, Error> {
         modules: Vec::new(),
     };
 
+    let traverse_timer = Timer::new("TestAST traverse");
     tests.traverse(&mut ast_runner);
+    drop(traverse_timer);
 
     let mut tokens = ast_runner.tokens;
 
