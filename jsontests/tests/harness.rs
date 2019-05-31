@@ -5,7 +5,13 @@
 extern crate jsontests_derive;
 
 #[derive(JsonTests)]
-#[directory = "jsontests/res/files/HarnessCorrectnessTests"]
-#[test_with = "jsontests::util::run_test"]
+#[directory = "jsontests/res/files/VMTestsHarnessCorrectnessTests"]
+#[test_with = "jsontests::vmtests::run_test"]
 #[should_panic]
-struct HarnessCorrectness;
+struct VMTestsHarnessCorrectness;
+
+#[derive(JsonTests)]
+#[directory = "jsontests/res/files/BlockchainTestsHarnessCorrectnessTests"]
+#[test_with = "jsontests::vmtests::run_test"]
+#[should_panic]
+struct BlockchainTestsHarnessCorrectionTests;

@@ -2,7 +2,7 @@
 name = "jsontests"
 version = "0.0.0"
 license = "Apache-2.0"
-authors = ["Stewart Mackenzie <setori88@gmail.com>", "Wei Tang <hi@that.world>"]
+authors = ["Stewart Mackenzie <setori88@gmail.com>", "Wei Tang <hi@that.world>", "Mike Lubinets <public@mersinvald.me>"]
 edition = "2018"
 
 [[bench]]
@@ -20,10 +20,7 @@ env_logger = "0.5.11"
 sha3 = "0.6"
 ethereum-rlp = { version = "0.2", default-features = false }
 criterion = "0.2.5"
-
-[features]
-default = []
-bench = []
+failure = "0.1.5"
 
 [target.'cfg(unix)'.dependencies]
 gag = "0.1.10"
