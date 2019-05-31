@@ -63,7 +63,7 @@ fn read_dir_and_emit_nodes(config: &Config, path: impl AsRef<Path>) -> Result<Ve
     use std::convert::identity;
 
     // For every directory entry, running in parallel
-    fs::read_dir(path)?.par_bridge()
+    fs::read_dir(path)?
         .map(|entry| -> Result<Option<TestAST>, Error> {
             let entry = entry?;
             let filetype = entry.file_type()?;
