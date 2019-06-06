@@ -20,7 +20,6 @@ pub struct CallbackDeclarationManager<'a> {
     m_balance: RefCell<Option<FunctionValue>>,
     m_create: RefCell<Option<FunctionValue>>,
     m_blockhash: RefCell<Option<FunctionValue>>,
-    m_sha3: RefCell<Option<FunctionValue>>,
     m_extcodesize: RefCell<Option<FunctionValue>>,
     m_extcodecopy: RefCell<Option<FunctionValue>>,
     m_log: RefCell<Option<FunctionValue>>,
@@ -37,8 +36,6 @@ pub struct CallbackTypes {
     m_balance: FunctionType,
     m_create: FunctionType,
     m_blockhash: FunctionType,
-
-    m_sha3: FunctionType,
 
     m_extcodesize: FunctionType,
     m_extcodecopy: FunctionType,
@@ -59,7 +56,6 @@ impl<'a> DeclarationManager<'a> for CallbackDeclarationManager<'a> {
             m_balance: RefCell::new(None),
             m_create: RefCell::new(None),
             m_blockhash: RefCell::new(None),
-            m_sha3: RefCell::new(None),
             m_extcodesize: RefCell::new(None),
             m_extcodecopy: RefCell::new(None),
             m_log: RefCell::new(None),
@@ -136,19 +132,6 @@ impl<'a> DeclarationManager<'a> for CallbackDeclarationManager<'a> {
                     let ret = decl.clone();
 
                     *self.m_blockhash.borrow_mut() = Some(decl);
-                    ret
-                }
-            }
-            "evm.sha3" => {
-                if let Some(decl) = *self.m_sha3.borrow() {
-                    decl.clone()
-                } else {
-                    // Explicitly clone here so that we can move decl inside the optional, and return its
-                    // copy to the user.
-                    let decl = self.init_sha3();
-                    let ret = decl.clone();
-
-                    *self.m_sha3.borrow_mut() = Some(decl);
                     ret
                 }
             }
@@ -263,13 +246,6 @@ impl<'a> CallbackDeclarationManager<'a> {
         decl
     }
 
-    fn init_sha3(&self) -> FunctionValue {
-        let module = self.m_context.module();
-        let sig = self.m_context.callback_types().get_type_sha3();
-        let decl = module.add_function("evm.sha3", sig, Some(External));
-        decl
-    }
-
     fn init_extcodesize(&self) -> FunctionValue {
         let module = self.m_context.module();
         let sig = self.m_context.callback_types().get_type_extcodesize();
@@ -320,7 +296,6 @@ impl CallbackTypes {
     get_type_impl!(get_type_balance, m_balance);
     get_type_impl!(get_type_create, m_create);
     get_type_impl!(get_type_blockhash, m_blockhash);
-    get_type_impl!(get_type_sha3, m_sha3);
     get_type_impl!(get_type_extcodesize, m_extcodesize);
     get_type_impl!(get_type_extcodecopy, m_extcodecopy);
     get_type_impl!(get_type_log, m_log);
@@ -364,11 +339,6 @@ impl CallbackTypes {
                 .arg(env.get_ptr_type())
                 .arg(evm.get_word_ptr_type())
                 .arg(evm.get_word_ptr_type())
-                .build()
-                .unwrap(),
-            m_sha3: FunctionTypeBuilder::new(context)
-                .arg(evm.get_byte_ptr_type())
-                .arg(evm.get_size_type())
                 .build()
                 .unwrap(),
             m_extcodesize: FunctionTypeBuilder::new(context) // maybe incorrect
@@ -437,7 +407,6 @@ mod tests {
     smoke_get_method!(sstore_signature, get_type_sstore);
     smoke_get_method!(balance_signature, get_type_balance);
     smoke_get_method!(blockhash_signature, get_type_blockhash);
-    smoke_get_method!(sha3_signature, get_type_sha3);
     smoke_get_method!(extcodesize_signature, get_type_extcodesize);
     smoke_get_method!(extcodecopy_signature, get_type_extcodecopy);
     smoke_get_method!(log_signature, get_type_log);
