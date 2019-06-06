@@ -212,9 +212,18 @@ impl<'a> DeclarationManager<'a> for CallbackDeclarationManager<'a> {
 // TODO: Add attributes to init methods after interface is decided.
 impl<'a> CallbackDeclarationManager<'a> {
     fn init_storageload(&self) -> FunctionValue {
+        let attrs = self.m_context.attributes();
         let module = self.m_context.module();
         let sig = self.m_context.callback_types().get_type_sload();
         let decl = module.add_function("evm.storageload", sig, Some(External));
+        // TODO: Needs readonly attr support
+        decl.add_attribute(2, *attrs.attr_noalias());
+        decl.add_attribute(2, *attrs.attr_nocapture());
+        decl.add_attribute(3, *attrs.attr_noalias());
+        decl.add_attribute(3, *attrs.attr_nocapture());
+        decl.add_attribute(4, *attrs.attr_noalias());
+        decl.add_attribute(4, *attrs.attr_nocapture());
+
         decl
     }
 
