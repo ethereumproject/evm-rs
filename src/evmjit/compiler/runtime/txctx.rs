@@ -37,8 +37,8 @@ impl TransactionContextType {
             i64_t.into(),                // Block number
             i64_t.into(),                // block timestamp
             i64_t.into(),                // Block gas limit
-            i256_t.into(),
-        ]; // Block difficulity
+            i256_t.into(),               // Block difficulty
+        ];
 
         let tx_struct = context.opaque_struct_type("evm.txctx");
         tx_struct.set_body(&fields, false);
@@ -187,6 +187,8 @@ impl<'a> TransactionContextManager<'a> {
         let env_data_singleton = jitctx.env();
         let tx_ctx_type = TransactionContextType::new(context);
 
+        // Allocate space on the stack for the TransactionContext to be store
+
         let tx_ctx_alloca = builder.build_alloca(tx_ctx_type.get_type(), "txctx");
 
         let tx_ctx_fn_t = FunctionTypeBuilder::new(context)
@@ -205,6 +207,11 @@ impl<'a> TransactionContextManager<'a> {
             .arg(env_data_singleton.get_ptr_type())
             .build()
             .unwrap();
+
+        // Build function to callback into user account to get transaction items such as:
+        // ORIGIN - Origin account address
+        // COINBASE - Miner of block
+        // GASPRICE
         
         let load_tx_ctx_fn = module.add_function("loadTxCtx", load_tx_ctx_fn_t, Some(Private));
 
@@ -225,6 +232,8 @@ impl<'a> TransactionContextManager<'a> {
 
         let temp_builder = context.create_builder();
         temp_builder.position_at_end(&check_bb);
+
+        // Only make callback once, since txctx information does not change during execution
 
         let flag_value = temp_builder.build_load(flag.into_pointer_value(), "");
         temp_builder.build_conditional_branch(flag_value.into_int_value(), &exit_bb, &load_bb);
@@ -250,15 +259,15 @@ impl<'a> TransactionContextManager<'a> {
         &self.m_tx_ctx_type
     }
 
-    pub fn get_tx_ctx_loaded_ssa_var(&self) -> PointerValue {
+    pub fn get_is_tx_ctx_loaded(&self) -> PointerValue {
         self.m_tx_ctx_loaded
     }
 
-    pub fn get_tx_ctx_ssa_var(&self) -> PointerValue {
+    pub fn get_tx_ctx(&self) -> PointerValue {
         self.m_tx_ctx
     }
 
-    pub fn get_tx_ctx_fn_ssa_var(&self) -> FunctionValue {
+    pub fn get_tx_ctx_fn(&self) -> FunctionValue {
         self.m_load_tx_ctx_fn
     }
 }

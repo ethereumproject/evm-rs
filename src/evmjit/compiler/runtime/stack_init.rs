@@ -2,14 +2,13 @@
 
 use evmjit::compiler::stack::EVM_MAX_STACK_SIZE;
 use evmjit::compiler::{DeclarationManager, ExternalFunctionManager};
-use inkwell::values::BasicValueEnum;
 use inkwell::values::PointerValue;
 
 use super::super::JITContext;
 
 #[derive(Debug, Copy, Clone)]
 pub struct StackAllocator {
-    stack_base: BasicValueEnum,
+    stack_base: PointerValue,
     stack_size_ptr: PointerValue,
 }
 
@@ -28,16 +27,16 @@ impl StackAllocator {
         builder.build_store(size_ptr, context.llvm_context().i64_type().const_zero());
 
         StackAllocator {
-            stack_base: base.try_as_basic_value().left().unwrap(),
+            stack_base: base.try_as_basic_value().left().unwrap().into_pointer_value(),
             stack_size_ptr: size_ptr,
         }
     }
 
-    pub fn get_stack_base_as_ir_value(&self) -> BasicValueEnum {
+    pub fn get_stack_base(&self) -> PointerValue {
         self.stack_base
     }
 
-    pub fn get_stack_size_as_ir_value(&self) -> PointerValue {
+    pub fn get_stack_size(&self) -> PointerValue {
         self.stack_size_ptr
     }
 }

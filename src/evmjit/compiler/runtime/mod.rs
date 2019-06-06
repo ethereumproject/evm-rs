@@ -126,7 +126,7 @@ impl MainPrologue {
         rt_type_mgr: &RuntimeTypeManager,
         gas_mgr: &GasPtrManager,
         main_func: FunctionValue,
-        stack_base: BasicValueEnum,
+        stack_base: PointerValue,
         decl_factory: &ExternalFunctionManager,
     ) -> MainPrologue {
         let context = jitctx.llvm_context();
@@ -191,7 +191,7 @@ impl<'a> RuntimeManager<'a> {
             &rt_type_manager,
             &gas_ptr_mgr,
             main_func_opt.unwrap(),
-            stack_allocator.get_stack_base_as_ir_value(),
+            stack_allocator.get_stack_base(),
             decl_factory,
         );
 
@@ -209,10 +209,10 @@ impl<'a> RuntimeManager<'a> {
     pub fn gen_tx_ctx_item_ir(&self, field: TransactionContextTypeFields) -> BasicValueEnum {
         let builder = self.m_context.builder();
         let call = builder.build_call(
-            self.m_txctx_manager.get_tx_ctx_fn_ssa_var(),
+            self.m_txctx_manager.get_tx_ctx_fn(),
             &[
-                self.m_txctx_manager.get_tx_ctx_loaded_ssa_var().into(),
-                self.m_txctx_manager.get_tx_ctx_ssa_var().into(),
+                self.m_txctx_manager.get_is_tx_ctx_loaded().into(),
+                self.m_txctx_manager.get_tx_ctx().into(),
                 self.m_rt_type_manager.get_env_ptr().into(),
             ],
             "",
@@ -221,7 +221,7 @@ impl<'a> RuntimeManager<'a> {
         let index = field.to_index();
 
         unsafe {
-            let mut ptr = builder.build_struct_gep(self.m_txctx_manager.get_tx_ctx_ssa_var(), index as u32, "");
+            let mut ptr = builder.build_struct_gep(self.m_txctx_manager.get_tx_ctx(), index as u32, "");
 
             // Origin and Coinbase are declared as arrays of 20 bytes (160 bits) to deal with alignment issues
             // Cast back to i160 pointer here
@@ -278,6 +278,14 @@ impl<'a> RuntimeManager<'a> {
 
     pub fn get_mem_ptr(&self) -> PointerValue {
         self.m_rt_type_manager.get_mem_ptr()
+    }
+
+    pub fn get_stack_base(&self) -> PointerValue {
+        self.m_stack_allocator.get_stack_base()
+    }
+
+    pub fn get_stack_size_ptr(&self) -> PointerValue {
+        self.m_stack_allocator.get_stack_size()
     }
 }
 
