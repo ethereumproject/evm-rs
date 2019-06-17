@@ -4,9 +4,7 @@ use inkwell::module::Linkage::*;
 use evmjit::compiler::util::funcbuilder::*;
 use inkwell::AddressSpace;
 use inkwell::values::FunctionValue;
-use inkwell::values::InstructionValue;
 use inkwell::IntPredicate;
-use inkwell::values::CallSiteValue;
 use super::super::JITContext;
 use evmjit::compiler::stack::EVM_MAX_STACK_SIZE;
 use evmjit::compiler::intrinsics::LLVMIntrinsic;
@@ -78,12 +76,6 @@ impl<'a> OperandStack<'a> {
         self.set(index, top_of_stack_val);
         self.set(0, val);
     }
-
-    //void LocalStack::finalize()
-    //{
-    //	m_sp->setArgOperand(2, m_builder.getInt64(minSize()));
-    //	m_sp->setArgOperand(3, m_builder.getInt64(maxSize()));
-    //	m_sp->setArgOperand(4, m_builder.getInt64(size()));
 
     pub fn finalize_stack(&self) {
         let builder = self.m_context.builder();
