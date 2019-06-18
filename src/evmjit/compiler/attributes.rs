@@ -10,6 +10,7 @@ pub struct LLVMAttributeFactory {
     attr_noreturn: Attribute,
     attr_speculatable: Attribute,
     attr_argmemonly: Attribute,
+    attr_readonly: Attribute,
 }
 
 impl LLVMAttributeFactory {
@@ -21,6 +22,7 @@ impl LLVMAttributeFactory {
         let attr_noreturn_id = Attribute::get_named_enum_kind_id("noreturn");
         let attr_speculatable_id = Attribute::get_named_enum_kind_id("speculatable");
         let attr_argmemonly_id = Attribute::get_named_enum_kind_id("argmemonly");
+        let attr_readonly = Attribute::get_named_enum_kind_id("readonly");
 
         LLVMAttributeFactory {
             attr_nounwind: context.create_enum_attribute(attr_nounwind_id, 0),
@@ -62,6 +64,10 @@ impl LLVMAttributeFactory {
     pub fn attr_argmemonly(&self) -> &Attribute {
         &self.attr_argmemonly
     }
+
+    pub fn attr_readonly(&self) -> &Attribute {
+        &self.attr_readonly
+    }
 }
 
 #[test]
@@ -77,6 +83,7 @@ fn test_llvm_attribute_factory() {
     let noreturn = attr_factory.attr_noreturn();
     let speculatable = attr_factory.attr_speculatable();
     let argmemonly = attr_factory.attr_argmemonly();
+    let readonly = attr_factory.attr_readonly();
 
     assert!(nocapture.is_enum());
     assert_eq!(nocapture.get_enum_value(), 0);
@@ -105,4 +112,8 @@ fn test_llvm_attribute_factory() {
     assert!(argmemonly.is_enum());
     assert_eq!(argmemonly.get_enum_value(), 0);
     assert_ne!(argmemonly.get_enum_kind_id(), 0);
+
+    assert!(readonly.is_enum());
+    assert_eq!(readonly.get_enum_value(), 0);
+    assert_ne!(readonly.get_enum_kind_id(), 0);
 }
