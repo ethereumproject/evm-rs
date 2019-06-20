@@ -139,12 +139,14 @@ extern crate secp256k1;
 extern crate block;
 #[cfg(test)]
 extern crate hexutil;
-#[cfg(feature = "precompiled-modexp")]
+#[cfg(any(feature = "precompiled-modexp", feature = "jit"))]
 extern crate num_bigint;
 
+#[cfg(feature = "jit")]
 extern crate inkwell;
-extern crate singletonum;
+#[cfg(feature = "jit")]
 extern crate llvm_sys;
+#[cfg(feature = "jit")]
 extern crate rand;
 
 mod util;
@@ -157,6 +159,8 @@ mod commit;
 mod patch;
 mod transaction;
 pub mod errors;
+
+#[cfg(feature = "jit")]
 pub mod evmjit;
 
 pub use self::memory::{Memory, SeqMemory};
