@@ -31,7 +31,7 @@ ethereum-hexutil = "0.2"
 
 
 [features]
-default = ["std", "rust-secp256k1"]
+default = ["std", "rust-secp256k1", "jit"]
 jit = ["default", "num-bigint", "llvm-sys", "inkwell", "rand"]
 c-secp256k1 = ["secp256k1-plus", "ethereum-block/c-secp256k1"]
 rust-secp256k1 = ["libsecp256k1", "ethereum-block/rust-secp256k1"]
