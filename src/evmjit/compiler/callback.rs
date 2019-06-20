@@ -18,7 +18,6 @@ pub struct CallbackDeclarationManager<'a> {
     m_storageload: RefCell<Option<FunctionValue>>,
     m_storagestore: RefCell<Option<FunctionValue>>,
     m_balance: RefCell<Option<FunctionValue>>,
-    m_calldataload: RefCell<Option<FunctionValue>>,
     m_create: RefCell<Option<FunctionValue>>,
     m_blockhash: RefCell<Option<FunctionValue>>,
     m_sha3: RefCell<Option<FunctionValue>>,
@@ -36,7 +35,6 @@ pub struct CallbackTypes {
     m_storagestore: FunctionType,
 
     m_balance: FunctionType,
-    m_calldataload: FunctionType,
     m_create: FunctionType,
     m_blockhash: FunctionType,
 
@@ -59,7 +57,6 @@ impl<'a> DeclarationManager<'a> for CallbackDeclarationManager<'a> {
             m_storageload: RefCell::new(None),
             m_storagestore: RefCell::new(None),
             m_balance: RefCell::new(None),
-            m_calldataload: RefCell::new(None),
             m_create: RefCell::new(None),
             m_blockhash: RefCell::new(None),
             m_sha3: RefCell::new(None),
@@ -112,19 +109,6 @@ impl<'a> DeclarationManager<'a> for CallbackDeclarationManager<'a> {
                     let ret = decl.clone();
 
                     *self.m_balance.borrow_mut() = Some(decl);
-                    ret
-                }
-            }
-            "evm.calldataload" => {
-                if let Some(decl) = *self.m_calldataload.borrow() {
-                    decl.clone()
-                } else {
-                    // Explicitly clone here so that we can move decl inside the optional, and return its
-                    // copy to the user.
-                    let decl = self.init_calldataload();
-                    let ret = decl.clone();
-
-                    *self.m_calldataload.borrow_mut() = Some(decl);
                     ret
                 }
             }
@@ -263,13 +247,6 @@ impl<'a> CallbackDeclarationManager<'a> {
         decl
     }
 
-    fn init_calldataload(&self) -> FunctionValue {
-        let module = self.m_context.module();
-        let sig = self.m_context.callback_types().get_type_calldataload();
-        let decl = module.add_function("evm.calldataload", sig, Some(External));
-        decl
-    }
-
     fn init_create(&self) -> FunctionValue {
         let module = self.m_context.module();
         let sig = self.m_context.callback_types().get_type_create();
@@ -339,7 +316,6 @@ impl CallbackTypes {
     get_type_impl!(get_type_sload, m_storageload);
     get_type_impl!(get_type_sstore, m_storagestore);
     get_type_impl!(get_type_balance, m_balance);
-    get_type_impl!(get_type_calldataload, m_calldataload);
     get_type_impl!(get_type_create, m_create);
     get_type_impl!(get_type_blockhash, m_blockhash);
     get_type_impl!(get_type_sha3, m_sha3);
@@ -373,7 +349,6 @@ impl CallbackTypes {
                 .arg(evm.get_word_ptr_type())
                 .build()
                 .unwrap(),
-            m_calldataload: FunctionTypeBuilder::new(context).build().unwrap(),
             m_create: FunctionTypeBuilder::new(context)
                 .arg(env.get_ptr_type())
                 .arg(evm.get_gas_ptr_type())
@@ -459,7 +434,6 @@ mod tests {
     smoke_get_method!(sload_signature, get_type_sload);
     smoke_get_method!(sstore_signature, get_type_sstore);
     smoke_get_method!(balance_signature, get_type_balance);
-    smoke_get_method!(calldataload_signature, get_type_calldataload);
     smoke_get_method!(blockhash_signature, get_type_blockhash);
     smoke_get_method!(sha3_signature, get_type_sha3);
     smoke_get_method!(extcodesize_signature, get_type_extcodesize);
