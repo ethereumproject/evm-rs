@@ -1,9 +1,8 @@
 #![allow(dead_code)]
 
-extern crate num_bigint;
 use util::opcode::Opcode;
 use inkwell::values::IntValue;
-use self::num_bigint::BigUint;
+use num_bigint::BigUint;
 use super::super::JITContext;
 
 
