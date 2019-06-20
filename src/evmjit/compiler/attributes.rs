@@ -22,7 +22,7 @@ impl LLVMAttributeFactory {
         let attr_noreturn_id = Attribute::get_named_enum_kind_id("noreturn");
         let attr_speculatable_id = Attribute::get_named_enum_kind_id("speculatable");
         let attr_argmemonly_id = Attribute::get_named_enum_kind_id("argmemonly");
-        let attr_readonly = Attribute::get_named_enum_kind_id("readonly");
+        let attr_readonly_id = Attribute::get_named_enum_kind_id("readonly");
 
         LLVMAttributeFactory {
             attr_nounwind: context.create_enum_attribute(attr_nounwind_id, 0),
@@ -32,6 +32,7 @@ impl LLVMAttributeFactory {
             attr_noreturn: context.create_enum_attribute(attr_noreturn_id, 0),
             attr_speculatable: context.create_enum_attribute(attr_speculatable_id, 0),
             attr_argmemonly: context.create_enum_attribute(attr_argmemonly_id, 0),
+            attr_readonly: context.create_enum_attribute(attr_readonly_id, 0),
         }
     }
 }

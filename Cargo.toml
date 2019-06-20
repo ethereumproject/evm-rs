@@ -22,17 +22,17 @@ num-bigint = { version = "0.1", optional = true }
 log = "0.4"
 lazy_static = "0.2"
 
-singletonum = "0.2.0"
-llvm-sys = "70.0"
-inkwell = { git = "https://github.com/TheDan64/inkwell", branch = "llvm7-0" }
-rand = "0.6"
+llvm-sys = { version = "70.0", optional = true }
+inkwell = { git = "https://github.com/TheDan64/inkwell", branch = "llvm7-0", optional = true }
+rand = { version = "0.6", optional = true }
 
 [dev-dependencies]
 ethereum-hexutil = "0.2"
 
 
 [features]
-default = ["std", "rust-secp256k1"]
+default = ["std", "rust-secp256k1", "jit"]
+jit = ["default", "num-bigint", "llvm-sys", "inkwell", "rand"]
 c-secp256k1 = ["secp256k1-plus", "ethereum-block/c-secp256k1"]
 rust-secp256k1 = ["libsecp256k1", "ethereum-block/rust-secp256k1"]
 std = ["ethereum-block-core/std", "ethereum-rlp/std", "ethereum-bigint/std", "ethereum-block"]
