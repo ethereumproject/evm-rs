@@ -6,7 +6,7 @@
 extern crate jsontests_derive;
 
 use bigint::{Address, Gas};
-use evm::{EmbeddedAccountPatch, Patch, Precompiled, EMBEDDED_PRECOMPILEDS};
+use ethereumvm::{EmbeddedAccountPatch, Patch, Precompiled, EMBEDDED_PRECOMPILEDS};
 
 // Shifting opcodes tests
 #[derive(JsonTests)]

@@ -1,9 +1,9 @@
 [package]
-name = "evm-cli"
+name = "ethereumvm-cli"
 version = "0.0.0"
 license = "Apache-2.0"
 authors = ["Wei Tang <hi@that.world>"]
-description = "SputnikVM CLI"
+description = "EthereumVM CLI"
 repository = "https://github.com/ethereumproject/evm-rs"
 edition = "2018"
 
@@ -17,14 +17,14 @@ edition = "2018"
 autobins = false
 
 [[bin]]
-name = "evm-cli"
+name = "ethereumvm-cli"
 path = "src/bin/main.rs"
 
 [dependencies]
 ethereum-bigint = "0.2"
 ethereum-hexutil = "0.2"
-evm = { path = ".." }
-evm-network-classic = { path = "../network/classic" }
+ethereumvm = { path = ".." }
+ethereumvm-network-classic = { path = "../network/classic" }
 gethrpc = { path = '../gethrpc' }
 clap = "2.22"
 serde_json = "1.0"

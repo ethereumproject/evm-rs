@@ -1,9 +1,9 @@
 use bigint::{Address, Gas, H160, U256};
-use evm::{
+use ethereumvm::{
     AccountPatch, Patch, Precompiled, ECREC_PRECOMPILED, ID_PRECOMPILED, RIP160_PRECOMPILED, SHA256_PRECOMPILED,
 };
-use evm_precompiled_bn128::{BN128_ADD_PRECOMPILED, BN128_MUL_PRECOMPILED, BN128_PAIRING_PRECOMPILED};
-use evm_precompiled_modexp::MODEXP_PRECOMPILED;
+use ethereumvm_precompiled_bn128::{BN128_ADD_PRECOMPILED, BN128_MUL_PRECOMPILED, BN128_PAIRING_PRECOMPILED};
+use ethereumvm_precompiled_modexp::MODEXP_PRECOMPILED;
 
 #[rustfmt::skip]
 pub static FRONTIER_PRECOMPILEDS: [(Address, Option<&'static [u8]>, &'static Precompiled); 4] = [

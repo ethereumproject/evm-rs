@@ -10,8 +10,8 @@
 
 use bigint::{Address, H256, M256, U256};
 use block::{Account, Transaction};
-use evm::errors::{PreExecutionError, RequireError};
-use evm::{
+use ethereumvm::errors::{PreExecutionError, RequireError};
+use ethereumvm::{
     AccountChange, AccountCommitment, AccountState, HeaderParams, Memory, Patch, TransactionVM, ValidTransaction, VM,
 };
 use sha3::{Digest, Keccak256};

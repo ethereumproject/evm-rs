@@ -2,7 +2,7 @@
 extern crate bigint;
 extern crate criterion;
 extern crate env_logger;
-extern crate evm;
+extern crate ethereumvm;
 extern crate hexutil;
 extern crate rlp;
 extern crate serde_json;
@@ -14,8 +14,8 @@ pub mod util;
 pub use self::blockchain::{create_block, create_context, JSONBlock};
 
 use bigint::{Address, Gas, H256, M256, U256};
-use evm::errors::RequireError;
-use evm::{Context, Patch, SeqContextVM, VMStatus, VM};
+use ethereumvm::errors::RequireError;
+use ethereumvm::{Context, Patch, SeqContextVM, VMStatus, VM};
 use hexutil::*;
 use serde_json::Value;
 use std::ops::Deref;

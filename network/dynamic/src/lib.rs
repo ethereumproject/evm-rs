@@ -1,4 +1,4 @@
-//! # Network-Agnostic SputnikVM Patches
+//! # Network-Agnostic EthereumVM Patches
 //!
 //! This crate provides re-exports of the DynamicPatch API, and a set of precompiled contracts
 //! covering everything up to ETH Constantinople
@@ -17,8 +17,8 @@
 //! ### Example
 //!
 //! ```
-//! use evm::{SeqTransactionVM, ValidTransaction, TransactionAction, HeaderParams};
-//! use evm_network::{DynamicPatch, DynamicAccountPatch, PRECOMPILEDS};
+//! use ethereumvm::{SeqTransactionVM, ValidTransaction, TransactionAction, HeaderParams};
+//! use ethereumvm_network::{DynamicPatch, DynamicAccountPatch, PRECOMPILEDS};
 //! use bigint::{Gas, U256, Address};
 //! use std::rc::Rc;
 //!
@@ -90,14 +90,14 @@
 //!
 //! # Patch API
 //!
-//! If you need just a single network or even a single feature-set, use the [Patch](evm::Patch)
+//! If you need just a single network or even a single feature-set, use the [Patch](ethereumvm::Patch)
 //! trait directly, that allows to create custom feature sets without DynamicPatch's tiny overhead.
 //!
 //! ### Example
 //!
 //! ```
-//! use evm::{SeqTransactionVM, ValidTransaction, TransactionAction, HeaderParams, Precompiled};
-//! use evm_network::{AccountPatch, Patch, PRECOMPILEDS};
+//! use ethereumvm::{SeqTransactionVM, ValidTransaction, TransactionAction, HeaderParams, Precompiled};
+//! use ethereumvm_network::{AccountPatch, Patch, PRECOMPILEDS};
 //! use bigint::{Gas, U256, Address};
 //! use std::rc::Rc;
 //!
@@ -179,12 +179,12 @@
 //! ```
 
 use bigint::{Address, H160};
-use evm::{Precompiled, ECREC_PRECOMPILED, ID_PRECOMPILED, RIP160_PRECOMPILED, SHA256_PRECOMPILED};
-use evm_precompiled_bn128::{BN128_ADD_PRECOMPILED, BN128_MUL_PRECOMPILED, BN128_PAIRING_PRECOMPILED};
-use evm_precompiled_modexp::MODEXP_PRECOMPILED;
+use ethereumvm::{Precompiled, ECREC_PRECOMPILED, ID_PRECOMPILED, RIP160_PRECOMPILED, SHA256_PRECOMPILED};
+use ethereumvm_precompiled_bn128::{BN128_ADD_PRECOMPILED, BN128_MUL_PRECOMPILED, BN128_PAIRING_PRECOMPILED};
+use ethereumvm_precompiled_modexp::MODEXP_PRECOMPILED;
 
 // Re-export DynamicPatch and Patch APIs
-pub use evm::{AccountPatch, DynamicAccountPatch, DynamicPatch, Patch};
+pub use ethereumvm::{AccountPatch, DynamicAccountPatch, DynamicPatch, Patch};
 
 #[rustfmt::skip]
 pub static PRECOMPILEDS: [(Address, Option<&'static [u8]>, &'static Precompiled); 8] = [

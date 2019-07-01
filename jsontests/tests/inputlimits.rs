@@ -1,6 +1,6 @@
 #![allow(non_snake_case)]
 
-use evm::VMTestPatch;
+use ethereumvm::VMTestPatch;
 use jsontests::test_transaction;
 use serde_json::Value;
 

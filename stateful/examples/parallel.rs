@@ -1,8 +1,8 @@
 extern crate bigint;
 extern crate block;
-extern crate evm;
-extern crate evm_network_classic;
-extern crate evm_stateful;
+extern crate ethereumvm;
+extern crate ethereumvm_network_classic;
+extern crate ethereumvm_stateful;
 extern crate hexutil;
 extern crate trie;
 #[macro_use]
@@ -10,9 +10,9 @@ extern crate lazy_static;
 
 use bigint::{Address, Gas, U256};
 use block::TransactionAction;
-use evm::{AccountChange, HeaderParams, SeqTransactionVM, Storage, ValidTransaction, VM};
-use evm_network_classic::MainnetEIP160Patch;
-use evm_stateful::{LiteralAccount, MemoryStateful};
+use ethereumvm::{AccountChange, HeaderParams, SeqTransactionVM, Storage, ValidTransaction, VM};
+use ethereumvm_network_classic::MainnetEIP160Patch;
+use ethereumvm_stateful::{LiteralAccount, MemoryStateful};
 use hexutil::*;
 use std::collections::{HashMap, HashSet};
 use std::ops::Deref;

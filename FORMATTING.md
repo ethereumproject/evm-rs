@@ -7,7 +7,7 @@ This repository incorporates a certain formatting style derived from the [rustfm
 Any other configuration is the **stable** `rustfmt` default.
 
 #### Running the formatter
-`evm-rs` is a complex project with a lot of sub-crates, so `cargo fmt` should be invoked with an `--all` argument.
+`ethereumvm` is a complex project with a lot of sub-crates, so `cargo fmt` should be invoked with an `--all` argument.
 ```bash
 cargo fmt --all
 ```
@@ -16,7 +16,7 @@ More info can be found at the [project page](https://github.com/rust-lang/rustfm
 #### Manual formatting overrides
 The formatting constraint is checked within Travis CI and Jenkins continuous integration pipelines, hence any pull-request should be formatted before it may be merged.
 
-Though, as most of the tooling generally is, `rustfmt` isn’t perfect and sometimes one would requite to force the manual formatting, as, for instance, it’s required for the `Patch` interface in `evm-rs`
+Though, as most of the tooling generally is, `rustfmt` isn’t perfect and sometimes one would requite to force the manual formatting, as, for instance, it’s required for the `Patch` interface in `ethereumvm`
 ##### Original code
 ```rust
 pub struct EmbeddedAccountPatch;
