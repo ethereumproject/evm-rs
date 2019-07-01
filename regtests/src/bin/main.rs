@@ -5,9 +5,9 @@ use std::str::FromStr;
 
 use bigint::{Address, Gas, H256, M256, U256};
 use block::TransactionAction;
-use evm::errors::RequireError;
-use evm::{AccountChange, AccountCommitment, HeaderParams, Log, Patch, SeqTransactionVM, ValidTransaction, VM};
-use evm_network_classic::{MainnetEIP150Patch, MainnetEIP160Patch, MainnetFrontierPatch, MainnetHomesteadPatch};
+use ethereumvm::errors::RequireError;
+use ethereumvm::{AccountChange, AccountCommitment, HeaderParams, Log, Patch, SeqTransactionVM, ValidTransaction, VM};
+use ethereumvm_network_classic::{MainnetEIP150Patch, MainnetEIP160Patch, MainnetFrontierPatch, MainnetHomesteadPatch};
 use gethrpc::{
     CachedGethRPCClient, GethRPCClient, NormalGethRPCClient, RPCBlock, RPCLog, RPCTransaction, RecordGethRPCClient,
 };

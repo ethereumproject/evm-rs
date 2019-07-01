@@ -1,5 +1,5 @@
 use bigint::{Address, Gas, H256, M256, U256};
-use evm::{AccountChange, AccountCommitment, Context, HeaderParams, Log};
+use ethereumvm::{AccountChange, AccountCommitment, Context, HeaderParams, Log};
 use hexutil::*;
 
 use rlp;

@@ -1,12 +1,12 @@
-# SputnikVM: Rust Ethereum Virtual Machine Implementation
+# EthereumVM: Rust Ethereum Virtual Machine Implementation
 
 [![Build Status](https://travis-ci.org/ethereumproject/evm-rs.svg?branch=master)](https://travis-ci.org/ethereumproject/evm-rs)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](./LICENSE)
 
 | Name               | Description                                   | Crates.io                                                                                                           | Documentation                                                                                        |
 |--------------------|:---------------------------------------------:|:-------------------------------------------------------------------------------------------------------------------:|:----------------------------------------------------------------------------------------------------:|
-| evm                | Core library for the Ethereum Virtual Machine | [![crates.io](https://img.shields.io/crates/v/evm.svg)](https://crates.io/crates/evm)                   | [![Documentation](https://docs.rs/evm/badge.svg)](https://docs.rs/evm)                   |
-| evm-stateful       | Merkle Trie stateful wrapper for SputnikVM    | [![crates.io](https://img.shields.io/crates/v/evm-stateful.svg)](https://crates.io/crates/evm-stateful) | [![Documentation](https://docs.rs/evm-stateful/badge.svg)](https://docs.rs/evm-stateful) |
+| ethereumvm         | Core library for the Ethereum Virtual Machine | [![crates.io](https://img.shields.io/crates/v/ethereumvm.svg)](https://crates.io/crates/ethereumvm)                   | [![Documentation](https://docs.rs/ethereumvm/badge.svg)](https://docs.rs/ethereumvm)                   |
+| ethereumvm-stateful| Merkle Trie stateful wrapper for EthereumVM   | [![crates.io](https://img.shields.io/crates/v/ethereumvm-stateful.svg)](https://crates.io/crates/ethereumvm-stateful) | [![Documentation](https://docs.rs/ethereumvm-stateful/badge.svg)](https://docs.rs/ethereumvm-stateful) |
 
 ## Features
 
@@ -20,25 +20,25 @@
 
 ## Supported Networks
 
-* Foundation ([evm-network-foundation](./network/foundation))
-* Classic ([evm-network-classic](./network/classic))
-* Ellaism ([evm-network-ellaism](./network/ellaism))
-* Expanse ([evm-network-expanse](./network/expanse))
-* Musicoin ([evm-network-musicoin](./network/musicoin))
-* Ubiq ([evm-network-ubiq](./network/ubiq))
-* All of the above and other networks ([evm-network-dynamic](./network/dynamic))
+* Foundation ([ethereumvm-network-foundation](./network/foundation))
+* Classic ([ethereumvm-network-classic](./network/classic))
+* Ellaism ([ethereumvm-network-ellaism](./network/ellaism))
+* Expanse ([ethereumvm-network-expanse](./network/expanse))
+* Musicoin ([ethereumvm-network-musicoin](./network/musicoin))
+* Ubiq ([ethereumvm-network-ubiq](./network/ubiq))
+* All of the above and other networks ([ethereumvm-network-dynamic](./network/dynamic))
 
 ## Supported Networks
 
 | Network          | Crates.io                                                                                                                               | Documentation                                                                                                            |
 |------------------|:---------------------------------------------------------------------------------------------------------------------------------------:|:------------------------------------------------------------------------------------------------------------------------:|
-| Any Network      | [![crates.io](https://img.shields.io/crates/v/evm-network.svg)](https://crates.io/crates/evm-network)                       | [![Documentation](https://docs.rs/evm-network/badge.svg)](https://docs.rs/evm-network)                       |
-| Ethereum Classic | [![crates.io](https://img.shields.io/crates/v/evm-network-classic.svg)](https://crates.io/crates/evm-network-classic)       | [![Documentation](https://docs.rs/evm-network-classic/badge.svg)](https://docs.rs/evm-network-classic)       |
-| Ethereum         | [![crates.io](https://img.shields.io/crates/v/evm-network-foundation.svg)](https://crates.io/crates/evm-network-foundation) | [![Documentation](https://docs.rs/evm-network-foundation/badge.svg)](https://docs.rs/evm-network-foundation) |
-| Ellaism          | [![crates.io](https://img.shields.io/crates/v/evm-network-ellaism.svg)](https://crates.io/crates/evm-network-ellaism)       | [![Documentation](https://docs.rs/evm-network-ellaism/badge.svg)](https://docs.rs/evm-network-ellaism)       |
-| Ubiq             | [![crates.io](https://img.shields.io/crates/v/evm-network-ubiq.svg)](https://crates.io/crates/evm-network-ubiq)             | [![Documentation](https://docs.rs/evm-network-ubiq/badge.svg)](https://docs.rs/evm-network-ubiq)             |
-| Expanse          | [![crates.io](https://img.shields.io/crates/v/evm-network-expanse.svg)](https://crates.io/crates/evm-network-expanse)       | [![Documentation](https://docs.rs/evm-network-expanse/badge.svg)](https://docs.rs/evm-network-expanse)       |
-| Musicoin         | [![crates.io](https://img.shields.io/crates/v/evm-network-musicoin.svg)](https://crates.io/crates/evm-network-musicoin)     | [![Documentation](https://docs.rs/evm-network-musicoin/badge.svg)](https://docs.rs/evm-network-musicoin)     |
+| Any Network      | [![crates.io](https://img.shields.io/crates/v/ethereumvm-network.svg)](https://crates.io/crates/ethereumvm-network)                       | [![Documentation](https://docs.rs/ethereumvm-network/badge.svg)](https://docs.rs/ethereumvm-network)                       |
+| Ethereum Classic | [![crates.io](https://img.shields.io/crates/v/ethereumvm-network-classic.svg)](https://crates.io/crates/ethereumvm-network-classic)       | [![Documentation](https://docs.rs/ethereumvm-network-classic/badge.svg)](https://docs.rs/ethereumvm-network-classic)       |
+| Ethereum         | [![crates.io](https://img.shields.io/crates/v/ethereumvm-network-foundation.svg)](https://crates.io/crates/ethereumvm-network-foundation) | [![Documentation](https://docs.rs/ethereumvm-network-foundation/badge.svg)](https://docs.rs/ethereumvm-network-foundation) |
+| Ellaism          | [![crates.io](https://img.shields.io/crates/v/ethereumvm-network-ellaism.svg)](https://crates.io/crates/ethereumvm-network-ellaism)       | [![Documentation](https://docs.rs/ethereumvm-network-ellaism/badge.svg)](https://docs.rs/ethereumvm-network-ellaism)       |
+| Ubiq             | [![crates.io](https://img.shields.io/crates/v/ethereumvm-network-ubiq.svg)](https://crates.io/crates/ethereumvm-network-ubiq)             | [![Documentation](https://docs.rs/ethereumvm-network-ubiq/badge.svg)](https://docs.rs/ethereumvm-network-ubiq)             |
+| Expanse          | [![crates.io](https://img.shields.io/crates/v/ethereumvm-network-expanse.svg)](https://crates.io/crates/ethereumvm-network-expanse)       | [![Documentation](https://docs.rs/ethereumvm-network-expanse/badge.svg)](https://docs.rs/ethereumvm-network-expanse)       |
+| Musicoin         | [![crates.io](https://img.shields.io/crates/v/ethereumvm-network-musicoin.svg)](https://crates.io/crates/ethereumvm-network-musicoin)     | [![Documentation](https://docs.rs/ethereumvm-network-musicoin/badge.svg)](https://docs.rs/ethereumvm-network-musicoin)     |
 
 ## Precompiled Contracts
 
@@ -46,8 +46,8 @@ The core library has the initial four precompiled contracts embedded. To use the
 
 | Name                         | Description                  | Crates.io                                                                                                                               | Documentation                                                                                                            |
 |------------------------------|:----------------------------:|:---------------------------------------------------------------------------------------------------------------------------------------:|:------------------------------------------------------------------------------------------------------------------------:|
-| evm-precompiled-bn128  | bn128 precompiled contracts  | [![crates.io](https://img.shields.io/crates/v/evm-precompiled-bn128.svg)](https://crates.io/crates/evm-precompiled-bn128)   | [![Documentation](https://docs.rs/evm-precompiled-bn128/badge.svg)](https://docs.rs/evm-precompiled-bn128)   |
-| evm-precompiled-modexp | modexp precompiled contracts | [![crates.io](https://img.shields.io/crates/v/evm-precompiled-modexp.svg)](https://crates.io/crates/evm-precompiled-modexp) | [![Documentation](https://docs.rs/evm-precompiled-modexp/badge.svg)](https://docs.rs/evm-precompiled-modexp) |
+| ethereumvm-precompiled-bn128  | bn128 precompiled contracts  | [![crates.io](https://img.shields.io/crates/v/ethereumvm-precompiled-bn128.svg)](https://crates.io/crates/ethereumvm-precompiled-bn128)   | [![Documentation](https://docs.rs/ethereumvm-precompiled-bn128/badge.svg)](https://docs.rs/ethereumvm-precompiled-bn128)   |
+| ethereumvm-precompiled-modexp | modexp precompiled contracts | [![crates.io](https://img.shields.io/crates/v/ethereumvm-precompiled-modexp.svg)](https://crates.io/crates/ethereumvm-precompiled-modexp) | [![Documentation](https://docs.rs/ethereumvm-precompiled-modexp/badge.svg)](https://docs.rs/ethereumvm-precompiled-modexp) |
 
 ## Related projects
 
@@ -55,12 +55,12 @@ The core library has the initial four precompiled contracts embedded. To use the
   common traits and structs for Ethereum. 
 * [etclient](https://source.that.world/source/etclient) -
   bare-minimal Ethereum client written in Rust.
-* [SputnikVM FFI](https://github.com/ethereumproject/evm-ffi) - SputnikVM C and Go FFI bindings
-* [SputnikVM Dev](https://github.com/ethereumproject/evm-dev) - SputnikVM instance for Smart Contract development, 
+* [EthereumVM FFI](https://github.com/ethereumproject/evm-ffi) - EthereumVM C and Go FFI bindings
+* [EthereumVM Dev](https://github.com/ethereumproject/evm-dev) - EthereumVM instance for Smart Contract development, 
    provides testing environment and mock for JSON RPC API
-* [SputnikVM in Browser](https://github.com/sorpaas/sputnikvm-in-browser) - experimental version of SputnikVM 
+* [EthereumVM in Browser](https://github.com/sorpaas/sputnikvm-in-browser) - experimental version of EthereumVM 
    compiled into WebAssembly, therefore can be launched in a browser on Node.js
-* [SputnikVM for embedded devices](https://github.com/sorpaas/sputnikvm-on-rux) - experimental project to run on 
+* [EthereumVM for embedded devices](https://github.com/sorpaas/sputnikvm-on-rux) - experimental project to run on 
    full functional EVM on embedded devices       
 
 ## Dependencies
@@ -70,28 +70,28 @@ before is not supported.
 
 ## Documentation
 
-* [Latest release documentation](https://docs.rs/evm)
+* [Latest release documentation](https://docs.rs/ethereumvm)
 
 ## Build from sources
 
-SputnikVM is written Rust. If you are not familiar with Rust please
+EthereumVM is written Rust. If you are not familiar with Rust please
 see the
 [getting started guide](https://doc.rust-lang.org/book/getting-started.html). 
 
 ### Build 
 
-To start working with SputnikVM you'll 
+To start working with EthereumVM you'll 
 need to install [rustup](https://www.rustup.rs/), then you can do:
  
 ```bash
-$ git clone git@github.com:ethereumproject/evm-rs.git
-$ cd evm-rs
+$ git clone git@github.com:ethereumproject/evm-rs.git ethereumvm
+$ cd ethereumvm
 $ cargo build --release --all
 ```
 
 ### Testing
 
-We currently use two ways to test SputnikVM and ensure its execution
+We currently use two ways to test EthereumVM and ensure its execution
 aligns with other Ethereum Virtual Machine implementations:
 
 * [jsontests](/jsontests): This uses part of the Ethereum

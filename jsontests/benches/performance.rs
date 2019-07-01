@@ -2,7 +2,7 @@
 
 #[macro_use]
 extern crate jsontests_derive;
-extern crate evm;
+extern crate ethereumvm;
 extern crate jsontests;
 #[macro_use]
 extern crate criterion;
@@ -18,7 +18,7 @@ use std::time::Duration;
 struct _Performance;
 
 pub fn criterion_cfg() -> Criterion {
-    // Due to poor SputnikVM performance, there's no chance to get a lot of measurements
+    // Due to poor EthereumVM performance, there's no chance to get a lot of measurements
     // and higher threshold is needed
     Criterion::default()
         .sample_size(2)

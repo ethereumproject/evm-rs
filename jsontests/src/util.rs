@@ -1,4 +1,4 @@
-use evm::Patch;
+use ethereumvm::Patch;
 use serde_json as json;
 use serde_json::Value;
 

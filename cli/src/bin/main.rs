@@ -9,11 +9,11 @@ use std::str::FromStr;
 use bigint::{Address, Gas, H256, M256, U256};
 use hexutil::read_hex;
 
-use evm::{
+use ethereumvm::{
     AccountCommitment, Context, HeaderParams, RequireError, SeqContextVM, SeqTransactionVM, TransactionAction,
     VMStatus, ValidTransaction, VM,
 };
-use evm_network_classic::{
+use ethereumvm_network_classic::{
     MainnetByzantiumPatch, MainnetConstantinoplePatch, MainnetEIP150Patch, MainnetEIP160Patch, MainnetFrontierPatch,
     MainnetHomesteadPatch,
 };
@@ -149,10 +149,10 @@ fn handle_fire_with_rpc<T: GethRPCClient>(client: &mut T, vm: &mut VM, block_num
 use clap::clap_app;
 
 fn main() {
-    let matches = clap_app!(evm =>
+    let matches = clap_app!(ethereumvm =>
         (version: "0.1")
         (author: "Ethereum Classic Contributors")
-        (about: "CLI tool for SputnikVM.")
+        (about: "CLI tool for EthereumVM.")
         (@arg CREATE: --create "Execute a CreateContract transaction instead of message call.")
         (@arg PROFILE: --profile "Whether to output a profiling result for the execution.")
         (@arg PROFILE_DUMP: --profile_dump +takes_value "Dump profiler result as HTML.")

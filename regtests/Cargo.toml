@@ -20,8 +20,8 @@ name = "regtests"
 path = "src/bin/main.rs"
 
 [dependencies]
-evm = { path = '..' }
-evm-network-classic = { path = "../network/classic" }
+ethereumvm = { path = '..' }
+ethereumvm-network-classic = { path = "../network/classic" }
 gethrpc = { path = '../gethrpc' }
 ethereum-block = "0.4"
 ethereum-bigint = "0.2"

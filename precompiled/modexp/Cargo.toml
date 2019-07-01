@@ -1,14 +1,14 @@
 [package]
-name = "evm-precompiled-modexp"
+name = "ethereumvm-precompiled-modexp"
 version = "0.11.0"
-description = "modexp precompiled contracts for SputnikVM."
+description = "modexp precompiled contracts for EthereumVM."
 license = "Apache-2.0"
 authors = ["Wei Tang <hi@that.world>"]
 repository = "https://github.com/ethereumproject/evm-rs"
 edition = "2018"
 
 [dependencies]
-evm = { version = "0.11", path = "../..", default-features = false  }
+ethereumvm = { version = "0.11", path = "../..", default-features = false  }
 ethereum-bigint = { version = "0.2", default-features = false }
 num-bigint = "0.1"
 
@@ -18,6 +18,6 @@ ethereum-hexutil = "0.2"
 [features]
 default = ["std", "rust-secp256k1"]
 rlp = ["ethereum-bigint/rlp"]
-c-secp256k1 = ["evm/c-secp256k1"]
-rust-secp256k1 = ["evm/rust-secp256k1"]
-std = ["evm/std"]
+c-secp256k1 = ["ethereumvm/c-secp256k1"]
+rust-secp256k1 = ["ethereumvm/rust-secp256k1"]
+std = ["ethereumvm/std"]

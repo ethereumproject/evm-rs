@@ -1,8 +1,8 @@
 use bigint::{Gas, U256};
 use std::rc::Rc;
 
-use evm::errors::{OnChainError, RuntimeError};
-use evm::Precompiled;
+use ethereumvm::errors::{OnChainError, RuntimeError};
+use ethereumvm::Precompiled;
 
 pub static BN128_ADD_PRECOMPILED: Bn128AddPrecompiled = Bn128AddPrecompiled;
 

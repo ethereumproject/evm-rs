@@ -176,6 +176,6 @@ fn derive_patch(config: &Config) -> (Ident, Ident) {
     if let Some(patch) = config.patch.as_ref() {
         (patch.name.clone(), patch.path.clone())
     } else {
-        (Ident::from("VMTestPatch"), Ident::from("evm::VMTestPatch"))
+        (Ident::from("VMTestPatch"), Ident::from("ethereumvm::VMTestPatch"))
     }
 }

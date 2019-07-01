@@ -1,15 +1,15 @@
 [package]
-name = "evm"
+name = "ethereumvm"
 version = "0.11.0"
 license = "Apache-2.0"
 authors = ["Wei Tang <hi@that.world>", "Mike Lubinets <public@mersinvald.me>"]
-description = "SputnikVM - a Portable Blockchain Virtual Machine"
+description = "EthereumVM - a Portable Blockchain Virtual Machine"
 repository = "https://github.com/ethereumproject/evm-rs"
 keywords = ["no_std", "ethereum"]
 edition = "2018"
 
 [lib]
-name = "evm"
+name = "ethereumvm"
 
 [dependencies]
 sha3 = "0.6"

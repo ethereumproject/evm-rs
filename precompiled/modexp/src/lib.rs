@@ -1,8 +1,8 @@
 use bigint::{Gas, U256};
 use std::rc::Rc;
 
-use evm::errors::{NotSupportedError, OnChainError, RuntimeError};
-use evm::Precompiled;
+use ethereumvm::errors::{NotSupportedError, OnChainError, RuntimeError};
+use ethereumvm::Precompiled;
 
 pub static MODEXP_PRECOMPILED: ModexpPrecompiled = ModexpPrecompiled;
 

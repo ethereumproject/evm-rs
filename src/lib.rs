@@ -1,13 +1,13 @@
-//! SputnikVM implementation, traits and structs.
+//! EthereumVM implementation, traits and structs.
 //!
-//! SputnikVM works on two different levels. It handles:
+//! EthereumVM works on two different levels. It handles:
 //! 1. a transaction, or
 //! 2. an Ethereum execution context.
 //!
 //! To interact with the virtual machine, you usually only need to
 //! work with [VM](trait.VM.html) methods.
 //!
-//! ### A SputnikVM's Lifecycle
+//! ### A EthereumVM's Lifecycle
 //!
 //! A VM can be started after it is given a `Transaction` (or
 //! `Context`) and a `BlockHeader`. The user can then `fire` or `step`
@@ -35,7 +35,7 @@
 //! multiple patches at the same time, it is recommended that you use
 //! trait objects.
 //!
-//! The example below creates a new SputnikVM and stores the object in
+//! The example below creates a new EthereumVM and stores the object in
 //! `vm` which can be used to `fire`, `step` or get status on. To do
 //! this, it must first create a transaction and a block header.  The
 //! patch associated with the VM is either `EmbeddedPatch` or
@@ -43,7 +43,7 @@
 //! the beginning of the program.
 //!
 //! ```
-//! use evm::{EmbeddedPatch, VMTestPatch,
+//! use ethereumvm::{EmbeddedPatch, VMTestPatch,
 //!                 HeaderParams, ValidTransaction, TransactionAction,
 //!                 VM, SeqTransactionVM};
 //! use bigint::{Gas, U256, Address};

@@ -1,5 +1,5 @@
 use bigint::{Address, Gas, H160, U256};
-use evm::{
+use ethereumvm::{
     AccountPatch, Patch, Precompiled, ECREC_PRECOMPILED, ID_PRECOMPILED, RIP160_PRECOMPILED, SHA256_PRECOMPILED,
 };
 
